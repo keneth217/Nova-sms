@@ -1,0 +1,22 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:novastack;MODE=MySQL;DB_CLOSE_DELAY=-1
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        type:
+          preferred_uuid_jdbc_type: CHAR
+  flyway:
+    enabled: false
+
+novastack:
+  jwt:
+    secret: test-secret-key-that-is-long-enough-for-hs256-algorithms
+  africastalking:
+    username: sandbox
+    api-key: test-key

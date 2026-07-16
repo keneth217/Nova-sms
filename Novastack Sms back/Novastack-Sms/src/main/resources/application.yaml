@@ -1,0 +1,78 @@
+spring:
+  application:
+    name: novastack-sms
+  datasource:
+    url: jdbc:mysql://localhost:3306/novastack_sms?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+    username: Samis
+    password: 5am15.tl
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+        type:
+          preferred_uuid_jdbc_type: BINARY
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+
+server:
+  port: 8092
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operationsSorter: method
+
+novastack:
+  jwt:
+    secret: NovastackSmsGatewayJwtSecretKeyThatIsLongEnoughForHS256ProductionUse2026
+    expiration-ms: 86400000
+  sms:
+    default-cost: 0.80
+    platform-sender-id: NOVASTACK
+    max-retries: 3
+  africastalking:
+    username: ${AT_USERNAME:sandbox}
+    api-key: ${AT_API_KEY:your-africas-talking-api-key}
+    base-url: ${AT_BASE_URL:https://api.sandbox.africastalking.com}
+    messaging-path: /version1/messaging
+  mpesa:
+    shortcode: ${MPESA_SHORTCODE:174379}
+    passkey: ${MPESA_PASSKEY:}
+    consumer-key: ${MPESA_CONSUMER_KEY:}
+    consumer-secret: ${MPESA_CONSUMER_SECRET:}
+    callback-base-url: ${MPESA_CALLBACK_BASE_URL:https://localhost:8080}
+    base-url: ${MPESA_BASE_URL:https://sandbox.safaricom.co.ke}
+    account-reference-prefix: NOVA
+    transaction-desc: Novastack SMS top-up
+  scheduler:
+    fixed-delay-ms: 30000
+  super-admin:
+    email: ${SUPER_ADMIN_EMAIL:admin@novastack.com}
+    password: ${SUPER_ADMIN_PASSWORD:ChangeMe123!}
+    full-name: Novastack Super Admin
+  organization:
+    event-active-days: ${ORG_EVENT_ACTIVE_DAYS:7}
+
+logging:
+  level:
+    com.novastack.sms: INFO
+    org.springframework.security: WARN
