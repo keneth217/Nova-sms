@@ -46,6 +46,14 @@ public class SenderIdService {
         return senderIdRepository.findByOrganizationId(organizationId);
     }
 
+    @Transactional(readOnly = true)
+    public List<SenderId> listAll(SenderIdStatus status) {
+        if (status == null) {
+            return senderIdRepository.findAllByOrderByUpdatedAtDesc();
+        }
+        return senderIdRepository.findByStatusOrderByUpdatedAtDesc(status);
+    }
+
     @Transactional
     public SenderId review(UUID senderId, SenderIdStatus status, String reason) {
         SenderId entity = senderIdRepository.findById(senderId)

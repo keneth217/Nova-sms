@@ -1,6 +1,7 @@
 package com.novastack.sms.controller;
 
 import com.novastack.sms.domain.enums.TopupStatus;
+import com.novastack.sms.domain.enums.UserRole;
 import com.novastack.sms.domain.enums.WalletTransactionType;
 import com.novastack.sms.dto.request.WalletTopupRequest;
 import com.novastack.sms.dto.response.ApiResponse;
@@ -8,6 +9,7 @@ import com.novastack.sms.dto.response.StkPushResponse;
 import com.novastack.sms.dto.response.WalletBalanceResponse;
 import com.novastack.sms.dto.response.WalletTransactionResponse;
 import com.novastack.sms.security.SecurityUtils;
+import com.novastack.sms.security.UserPrincipal;
 import com.novastack.sms.service.WalletService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -86,6 +88,12 @@ public class WalletController {
             @RequestParam(required = false) WalletTransactionType type,
             @RequestParam(required = false) List<TopupStatus> status,
             @PageableDefault(size = 20) Pageable pageable) {
+        UserPrincipal principal = SecurityUtils.currentUser();
+        if (organizationId == null
+                && principal.getRole() == UserRole.SUPER_ADMIN
+                && principal.getOrganizationId() == null) {
+            return ApiResponse.ok(walletService.platformHistory(type, status, pageable));
+        }
         UUID orgId = SecurityUtils.resolveOrganizationId(organizationId);
         return ApiResponse.ok(walletService.history(orgId, type, status, pageable));
     }

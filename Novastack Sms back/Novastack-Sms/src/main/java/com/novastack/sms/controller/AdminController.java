@@ -1,11 +1,18 @@
 package com.novastack.sms.controller;
 
+import com.novastack.sms.domain.entity.SenderId;
 import com.novastack.sms.domain.enums.OrganizationStatus;
+import com.novastack.sms.domain.enums.SenderIdStatus;
+import com.novastack.sms.domain.enums.TopupStatus;
 import com.novastack.sms.domain.enums.UserRole;
 import com.novastack.sms.dto.response.AdminOrganizationResponse;
 import com.novastack.sms.dto.response.ApiResponse;
+import com.novastack.sms.dto.response.SmsMessageResponse;
 import com.novastack.sms.dto.response.UserResponse;
+import com.novastack.sms.dto.response.WalletTransactionResponse;
 import com.novastack.sms.service.AdminService;
+import com.novastack.sms.service.SenderIdService;
+import com.novastack.sms.service.SmsService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +27,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -31,6 +39,8 @@ import java.util.UUID;
 public class AdminController {
 
     private final AdminService adminService;
+    private final SmsService smsService;
+    private final SenderIdService senderIdService;
 
     @GetMapping("/organizations")
     @Operation(summary = "List all registered organizations")
@@ -83,5 +93,26 @@ public class AdminController {
     @Operation(summary = "Platform overview counts")
     public ApiResponse<Map<String, Long>> overview() {
         return ApiResponse.ok(adminService.platformOverview());
+    }
+
+    @GetMapping("/topups")
+    @Operation(summary = "List wallet top-ups across all organizations")
+    public ApiResponse<Page<WalletTransactionResponse>> listTopups(
+            @RequestParam(required = false) TopupStatus status,
+            @PageableDefault(size = 50) Pageable pageable) {
+        return ApiResponse.ok(adminService.listTopups(status, pageable));
+    }
+
+    @GetMapping("/sms")
+    @Operation(summary = "List SMS messages across all organizations")
+    public ApiResponse<Page<SmsMessageResponse>> listSms(@PageableDefault(size = 50) Pageable pageable) {
+        return ApiResponse.ok(smsService.platformHistory(pageable));
+    }
+
+    @GetMapping("/sender-ids")
+    @Operation(summary = "List sender IDs across all organizations")
+    public ApiResponse<List<SenderId>> listSenderIds(
+            @RequestParam(required = false) SenderIdStatus status) {
+        return ApiResponse.ok(senderIdService.listAll(status));
     }
 }

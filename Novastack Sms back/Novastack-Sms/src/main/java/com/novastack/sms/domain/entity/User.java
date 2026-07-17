@@ -45,6 +45,20 @@ public class User {
     @Builder.Default
     private boolean enabled = true;
 
+    @Column(name = "token_version", nullable = false)
+    @Builder.Default
+    private long tokenVersion = 0L;
+
+    @Column(name = "terms_accepted", nullable = false)
+    @Builder.Default
+    private boolean termsAccepted = false;
+
+    @Column(name = "terms_accepted_at")
+    private Instant termsAcceptedAt;
+
+    @Column(name = "privacy_accepted_at")
+    private Instant privacyAcceptedAt;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

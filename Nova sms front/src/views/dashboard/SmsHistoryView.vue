@@ -74,7 +74,15 @@ async function applyFilters() {
         <td class="max-w-sm truncate px-4 py-3 text-slate-600">{{ row.content }}</td>
         <td class="whitespace-nowrap px-4 py-3">{{ formatCurrency(row.cost) }}</td>
         <td class="px-4 py-3"><EntityStatusBadge :status="row.status" /></td>
-        <td class="whitespace-nowrap px-4 py-3 text-slate-500">{{ formatDate(row.createdAt) }}</td>
+        <td class="whitespace-nowrap px-4 py-3 text-slate-500">
+          <template v-if="row.status === 'SCHEDULED' && row.scheduledAt">
+            <span class="block text-xs text-brand-700">Sends {{ formatDate(row.scheduledAt) }}</span>
+            <span class="text-[11px] text-slate-400">Created {{ formatDate(row.createdAt) }}</span>
+          </template>
+          <template v-else>
+            {{ formatDate(row.createdAt) }}
+          </template>
+        </td>
       </tr>
     </DataTable>
   </div>

@@ -18,6 +18,8 @@ public interface SmsMessageRepository extends JpaRepository<SmsMessage, UUID> {
 
     Page<SmsMessage> findByOrganizationIdOrderByCreatedAtDesc(UUID organizationId, Pageable pageable);
 
+    Page<SmsMessage> findAllByOrderByCreatedAtDesc(Pageable pageable);
+
     Optional<SmsMessage> findByProviderMessageId(String providerMessageId);
 
     @Query("SELECT m FROM SmsMessage m JOIN FETCH m.organization WHERE m.id = :id")

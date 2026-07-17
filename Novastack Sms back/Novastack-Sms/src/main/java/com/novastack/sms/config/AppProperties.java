@@ -21,14 +21,14 @@ public class AppProperties {
     @Getter
     @Setter
     public static class Jwt {
-        private String secret = "change-me-to-a-very-long-secure-secret-key-at-least-256-bits";
+        private String secret = "7f3c9e2a8d4b1f6c5e7a9d2c4b8f1e6a3c7d9b2f5e8a1c4d6f9b3e7a2d5c8f1b4e6a9d3c7f2b5e8a1d4c6f9b2e7a5";
         private long expirationMs = 86400000L;
     }
 
     @Getter
     @Setter
     public static class Sms {
-        private BigDecimal defaultCost = new BigDecimal("0.80");
+        private BigDecimal defaultCost = new BigDecimal("1.00");
         private String platformSenderId = "NOVASTACK";
         private int maxRetries = 3;
     }
@@ -50,8 +50,8 @@ public class AppProperties {
         private String passkey = "";
         private String consumerKey = "";
         private String consumerSecret = "";
-        /** Public HTTPS callback base, e.g. https://api.yourdomain.com */
-        private String callbackBaseUrl = "https://localhost:8080";
+        /** Public HTTPS callback base, e.g. https://smsapi.novastack.co.ke */
+        private String callbackBaseUrl = "https://smsapi.novastack.co.ke";
         private String baseUrl = "https://sandbox.safaricom.co.ke";
         private String accountReferencePrefix = "NOVA";
         private String transactionDesc = "Novastack SMS wallet top-up";
@@ -60,9 +60,9 @@ public class AppProperties {
     @Getter
     @Setter
     public static class SuperAdmin {
-        private String email = "admin@novastack.com";
-        private String password = "ChangeMe123!";
-        private String fullName = "Novastack Super Admin";
+        private String email = "kipyegonkeneth03@gmail.com";
+        private String password = "Designer@3689.";
+        private String fullName = "Keneth Kipyegon";
     }
 
     @Getter

@@ -101,7 +101,7 @@ function logout() {
           class="absolute right-0 mt-2 w-52 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg shadow-slate-900/10"
         >
           <RouterLink
-            to="/settings"
+            to="/profile"
             class="flex items-center gap-2 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"
             @click="menuOpen = false"
           >

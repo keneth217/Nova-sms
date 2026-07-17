@@ -79,6 +79,12 @@ function fillDemo(role: 'org' | 'org-phone' | 'admin') {
         >
           Your session expired. Please sign in again.
         </div>
+        <div
+          v-if="route.query.password === 'changed'"
+          class="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800"
+        >
+          Password updated. Sign in with your new password.
+        </div>
 
         <form class="mt-6 space-y-4" @submit.prevent="onSubmit">
           <FormField
@@ -101,6 +107,14 @@ function fillDemo(role: 'org' | 'org-phone' | 'admin') {
               placeholder="••••••••"
             />
           </FormField>
+          <div class="-mt-2 text-right">
+            <RouterLink
+              to="/forgot-password"
+              class="text-sm font-medium text-brand-700 hover:text-brand-800"
+            >
+              Forgot password?
+            </RouterLink>
+          </div>
 
           <p v-if="localError || auth.error" class="text-sm text-rose-600">
             {{ localError || auth.error }}

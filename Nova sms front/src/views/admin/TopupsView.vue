@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { walletService } from '@/api/wallet.service'
 import { organizationService } from '@/api/organization.service'
 import type { WalletTransaction } from '@/models/wallet.model'
 import type { AdminOrganization } from '@/models/organization.model'
@@ -34,7 +33,7 @@ onMounted(async () => {
   error.value = ''
   try {
     const [page, orgs] = await Promise.all([
-      walletService.getTransactions({ type: 'TOPUP', size: 50 }),
+      organizationService.listTopups({ size: 50 }),
       organizationService.listOrganizations({ size: 100 }),
     ])
     transactions.value = page.content

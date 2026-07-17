@@ -87,9 +87,14 @@ onMounted(async () => {
 
 <template>
   <div>
-    <section class="relative min-h-[100svh] overflow-hidden">
+    <section class="relative min-h-[78svh] overflow-hidden bg-[#fff7ed]">
+      <img
+        src="/girls.png"
+        alt="Friends reading a message together on a phone"
+        class="absolute inset-0 h-full w-full object-cover object-center"
+      />
       <div
-        class="absolute inset-0 bg-[linear-gradient(165deg,#eef7f5_0%,#f7faf9_38%,#e8f1f4_100%)]"
+        class="absolute inset-0 bg-[linear-gradient(90deg,rgba(255,250,242,0.98)_0%,rgba(255,248,238,0.94)_36%,rgba(255,247,237,0.38)_66%,rgba(255,247,237,0.04)_100%)]"
       />
       <div
         class="pointer-events-none absolute inset-0 opacity-[0.4]"
@@ -99,14 +104,11 @@ onMounted(async () => {
         "
       />
       <div
-        class="landing-orb pointer-events-none absolute -right-20 top-16 h-[28rem] w-[28rem] rounded-full bg-brand-200/50 blur-3xl"
-      />
-      <div
-        class="landing-orb-delayed pointer-events-none absolute -left-24 bottom-10 h-80 w-80 rounded-full bg-sky-200/40 blur-3xl"
+        class="landing-orb-delayed pointer-events-none absolute -left-24 bottom-10 h-80 w-80 rounded-full bg-orange-200/40 blur-3xl"
       />
 
       <div
-        class="relative mx-auto flex min-h-[100svh] max-w-6xl flex-col justify-center px-4 pb-20 pt-28 sm:px-6 lg:px-8"
+        class="relative mx-auto flex min-h-[78svh] max-w-6xl flex-col justify-center px-4 pb-14 pt-24 sm:px-6 lg:px-8"
       >
         <p
           class="landing-fade-up font-serif text-5xl font-bold tracking-tight text-slate-900 sm:text-6xl lg:text-7xl"
@@ -149,29 +151,56 @@ onMounted(async () => {
     </section>
 
     <section class="border-y border-slate-200/80 bg-white">
-      <div class="mx-auto max-w-3xl px-4 py-16 text-center sm:px-6 lg:px-8">
-        <h2 class="font-serif text-2xl font-bold text-slate-900 sm:text-3xl">
-          Built for businesses — and for people who only need SMS once
-        </h2>
-        <p class="mt-4 text-base leading-relaxed text-slate-600 sm:text-lg">
-          Not every sender needs a permanent operations stack. If you are organizing a wedding,
-          community meeting, or short campaign, you can register, fund a small wallet, notify everyone, and
-          leave. Businesses that send every day get the same reliable gateway, wallets, and reports.
-        </p>
+      <div
+        class="mx-auto grid max-w-6xl items-center gap-10 px-4 py-16 sm:px-6 lg:grid-cols-2 lg:px-8"
+      >
+        <div>
+          <p class="text-sm font-semibold uppercase tracking-wider text-brand-700">
+            Messaging made human
+          </p>
+          <h2 class="mt-2 font-serif text-2xl font-bold text-slate-900 sm:text-3xl">
+            Built for businesses — and for people who only need SMS once
+          </h2>
+          <p class="mt-4 text-base leading-relaxed text-slate-600 sm:text-lg">
+            Not every sender needs a permanent operations stack. If you are organizing a wedding,
+            community meeting, or short campaign, you can register, fund a small wallet, notify
+            everyone, and leave. Businesses that send every day get the same reliable gateway,
+            wallets, and reports.
+          </p>
+        </div>
+        <div class="relative">
+          <div class="absolute -inset-3 rounded-[2rem] bg-brand-100/60 blur-2xl" />
+          <img
+            src="/girls2.png"
+            alt="Friends sharing an SMS update on a phone"
+            loading="lazy"
+            class="relative aspect-[4/3] w-full rounded-3xl object-cover shadow-xl shadow-slate-900/10"
+          />
+        </div>
       </div>
     </section>
 
     <section id="events" class="scroll-mt-20 bg-[#f4f7f6]">
       <div class="mx-auto max-w-6xl px-4 py-20 sm:px-6 lg:px-8">
-        <div class="max-w-2xl">
-          <p class="text-sm font-semibold uppercase tracking-wider text-brand-700">One-time sending</p>
-          <h2 class="mt-2 font-serif text-3xl font-bold text-slate-900 sm:text-4xl">
-            Perfect for events, ceremonies, and short notices
-          </h2>
-          <p class="mt-3 text-base text-slate-600">
-            Create an account, stay active for about one week, send what you need, and you do not
-            have to come back.
-          </p>
+        <div class="grid items-center gap-10 lg:grid-cols-[0.8fr_1fr]">
+          <div class="max-w-2xl lg:order-2">
+            <p class="text-sm font-semibold uppercase tracking-wider text-brand-700">
+              One-time sending
+            </p>
+            <h2 class="mt-2 font-serif text-3xl font-bold text-slate-900 sm:text-4xl">
+              Perfect for events, ceremonies, and short notices
+            </h2>
+            <p class="mt-3 text-base text-slate-600">
+              Create an account, stay active for about one week, send what you need, and you do not
+              have to come back.
+            </p>
+          </div>
+          <img
+            src="/girls3.png"
+            alt="Happy event organizer celebrating after sending an update"
+            loading="lazy"
+            class="aspect-[16/10] w-full rounded-3xl object-cover shadow-lg shadow-slate-900/10 lg:order-1"
+          />
         </div>
 
         <div class="mt-12 grid gap-10 sm:grid-cols-3">
@@ -217,14 +246,22 @@ onMounted(async () => {
 
     <section id="features" class="scroll-mt-20 border-t border-slate-200/80 bg-white">
       <div class="mx-auto max-w-6xl px-4 py-20 sm:px-6 lg:px-8">
-        <div class="max-w-2xl">
-          <p class="text-sm font-semibold uppercase tracking-wider text-brand-700">Features</p>
-          <h2 class="mt-2 font-serif text-3xl font-bold text-slate-900 sm:text-4xl">
-            Simple enough for a one-week send — strong enough for daily use
-          </h2>
-          <p class="mt-3 text-base text-slate-600">
-            Whether you send once for an event or run monthly campaigns, the same tools apply.
-          </p>
+        <div class="grid items-end gap-10 lg:grid-cols-[1fr_0.72fr]">
+          <div class="max-w-2xl">
+            <p class="text-sm font-semibold uppercase tracking-wider text-brand-700">Features</p>
+            <h2 class="mt-2 font-serif text-3xl font-bold text-slate-900 sm:text-4xl">
+              Simple enough for a one-week send — strong enough for daily use
+            </h2>
+            <p class="mt-3 text-base text-slate-600">
+              Whether you send once for an event or run monthly campaigns, the same tools apply.
+            </p>
+          </div>
+          <img
+            src="/girls4.png"
+            alt="A successful sender celebrating with her phone"
+            loading="lazy"
+            class="aspect-[16/9] w-full rounded-3xl object-cover object-center shadow-lg shadow-slate-900/10"
+          />
         </div>
 
         <div class="mt-12 grid gap-x-10 gap-y-12 sm:grid-cols-2 lg:grid-cols-3">

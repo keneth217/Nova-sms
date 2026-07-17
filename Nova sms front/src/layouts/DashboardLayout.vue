@@ -5,14 +5,25 @@ import Sidebar from '@/components/dashboard/Sidebar.vue'
 import Navbar from '@/components/dashboard/Navbar.vue'
 import { useAuthStore } from '@/stores/auth.store'
 import { useWalletStore } from '@/stores/wallet.store'
+import { useOrganizationStore } from '@/stores/organization.store'
 
 const sidebarOpen = ref(false)
 const auth = useAuthStore()
 const wallet = useWalletStore()
+const org = useOrganizationStore()
 
 onMounted(() => {
   if (!auth.isSuperAdmin) {
     void wallet.fetchBalance()
+    if (auth.user?.organizationId && !org.organizationName) {
+      void org.fetchCurrentOrganization().catch(() => {
+        if (auth.user?.organizationName) {
+          org.setOrganizationName(auth.user.organizationName)
+        }
+      })
+    } else if (auth.user?.organizationName && !org.organizationName) {
+      org.setOrganizationName(auth.user.organizationName)
+    }
   }
 })
 </script>

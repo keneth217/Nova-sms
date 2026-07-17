@@ -19,6 +19,7 @@ public class AuthResponse {
     private String fullName;
     private UserRole role;
     private UUID organizationId;
+    private String organizationName;
     private OrganizationAccountType accountType;
     private Instant expiresAt;
 }

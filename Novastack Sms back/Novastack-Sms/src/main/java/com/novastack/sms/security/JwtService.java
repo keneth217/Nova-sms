@@ -30,6 +30,7 @@ public class JwtService {
                 .subject(principal.getEmail())
                 .claim("uid", principal.getId() != null ? principal.getId().toString() : null)
                 .claim("role", principal.getRole().name())
+                .claim("ver", principal.getTokenVersion())
                 .issuedAt(now)
                 .expiration(expiry);
 
@@ -54,12 +55,13 @@ public class JwtService {
     }
 
     public boolean isTokenValid(String token, UserPrincipal principal) {
-        String email = extractEmail(token);
-        return email.equals(principal.getEmail()) && !isExpired(token);
-    }
-
-    private boolean isExpired(String token) {
-        return parseClaims(token).getExpiration().before(new Date());
+        Claims claims = parseClaims(token);
+        String email = claims.getSubject();
+        Number versionClaim = claims.get("ver", Number.class);
+        long tokenVersion = versionClaim != null ? versionClaim.longValue() : 0L;
+        return email.equals(principal.getEmail())
+                && tokenVersion == principal.getTokenVersion()
+                && !claims.getExpiration().before(new Date());
     }
 
     private Claims parseClaims(String token) {

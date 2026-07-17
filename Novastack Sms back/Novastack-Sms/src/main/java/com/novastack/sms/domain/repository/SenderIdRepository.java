@@ -12,6 +12,10 @@ public interface SenderIdRepository extends JpaRepository<SenderId, UUID> {
 
     List<SenderId> findByOrganizationId(UUID organizationId);
 
+    List<SenderId> findAllByOrderByUpdatedAtDesc();
+
+    List<SenderId> findByStatusOrderByUpdatedAtDesc(SenderIdStatus status);
+
     Optional<SenderId> findByOrganizationIdAndSenderNameIgnoreCase(UUID organizationId, String senderName);
 
     Optional<SenderId> findFirstByPlatformDefaultTrueAndStatus(SenderIdStatus status);

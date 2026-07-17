@@ -15,12 +15,18 @@ const resourceLinks = [
   { to: '/register?intent=business', label: 'Business account' },
   { to: '/login', label: 'Customer login' },
 ]
+
+const legalLinks = [
+  { to: '/terms', label: 'Terms of Service' },
+  { to: '/privacy', label: 'Privacy Policy' },
+  { to: '/acceptable-use', label: 'Acceptable Use Policy' },
+]
 </script>
 
 <template>
   <footer class="border-t border-slate-200 bg-slate-900 text-slate-400">
     <div class="mx-auto max-w-6xl px-4 py-14 sm:px-6 lg:px-8">
-      <div class="grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
+      <div class="grid gap-10 sm:grid-cols-2 lg:grid-cols-5">
         <div class="sm:col-span-2 lg:col-span-2">
           <RouterLink to="/" class="inline-flex items-center gap-2.5">
             <span
@@ -51,6 +57,17 @@ const resourceLinks = [
           <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Account</p>
           <ul class="mt-4 space-y-2.5">
             <li v-for="link in resourceLinks" :key="link.label">
+              <RouterLink :to="link.to" class="text-sm transition hover:text-white">
+                {{ link.label }}
+              </RouterLink>
+            </li>
+          </ul>
+        </div>
+
+        <div>
+          <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Legal</p>
+          <ul class="mt-4 space-y-2.5">
+            <li v-for="link in legalLinks" :key="link.label">
               <RouterLink :to="link.to" class="text-sm transition hover:text-white">
                 {{ link.label }}
               </RouterLink>

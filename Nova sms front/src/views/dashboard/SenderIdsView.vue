@@ -72,8 +72,12 @@ async function review(id: string, status: 'APPROVED' | 'REJECTED') {
       <AppCard
         class="lg:col-span-2"
         :class="{ 'lg:col-span-3': auth.isSuperAdmin }"
-        title="Your sender IDs"
-        subtitle="Approved IDs can be used for outbound traffic"
+        title="Sender IDs"
+        :subtitle="
+          auth.isSuperAdmin
+            ? 'Review requests across all organizations'
+            : 'Approved IDs can be used for outbound traffic'
+        "
         :padding="false"
       >
         <DataTable

@@ -2,6 +2,7 @@ package com.novastack.sms.service;
 
 import com.novastack.sms.domain.entity.Organization;
 import com.novastack.sms.domain.entity.User;
+import com.novastack.sms.domain.entity.WalletTransaction;
 import com.novastack.sms.domain.enums.OrganizationStatus;
 import com.novastack.sms.domain.enums.SenderIdStatus;
 import com.novastack.sms.domain.enums.TopupStatus;
@@ -15,6 +16,7 @@ import com.novastack.sms.domain.repository.WalletRepository;
 import com.novastack.sms.domain.repository.WalletTransactionRepository;
 import com.novastack.sms.dto.response.AdminOrganizationResponse;
 import com.novastack.sms.dto.response.UserResponse;
+import com.novastack.sms.dto.response.WalletTransactionResponse;
 import com.novastack.sms.exception.ApiException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -24,7 +26,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -94,6 +98,20 @@ public class AdminService {
     }
 
     @Transactional(readOnly = true)
+    public Page<WalletTransactionResponse> listTopups(
+            TopupStatus status,
+            Pageable pageable) {
+        boolean statusesEmpty = status == null;
+        Collection<TopupStatus> statuses = statusesEmpty
+                ? List.of(TopupStatus.PENDING)
+                : List.of(status);
+
+        return walletTransactionRepository
+                .findPlatformFiltered(WalletTransactionType.TOPUP, statuses, statusesEmpty, pageable)
+                .map(this::toTransactionResponse);
+    }
+
+    @Transactional(readOnly = true)
     public UserResponse getUser(UUID userId) {
         User user = userRepository.findByIdWithOrganization(userId)
                 .orElseThrow(() -> new ApiException("User not found", HttpStatus.NOT_FOUND));
@@ -141,6 +159,26 @@ public class AdminService {
                 .organizationId(user.getOrganization() != null ? user.getOrganization().getId() : null)
                 .organizationName(user.getOrganization() != null ? user.getOrganization().getName() : null)
                 .createdAt(user.getCreatedAt())
+                .build();
+    }
+
+    private WalletTransactionResponse toTransactionResponse(WalletTransaction tx) {
+        return WalletTransactionResponse.builder()
+                .id(tx.getId())
+                .organizationId(tx.getOrganization().getId())
+                .type(tx.getType())
+                .amount(tx.getAmount())
+                .balanceBefore(tx.getBalanceBefore())
+                .balanceAfter(tx.getBalanceAfter())
+                .reference(tx.getReference())
+                .description(tx.getDescription())
+                .mpesaReceipt(tx.getMpesaReceipt())
+                .phoneNumber(tx.getPhoneNumber())
+                .checkoutRequestId(tx.getCheckoutRequestId())
+                .status(tx.getTopupStatus())
+                .resultCode(tx.getResultCode())
+                .resultDesc(tx.getResultDesc())
+                .createdAt(tx.getCreatedAt())
                 .build();
     }
 

@@ -9,11 +9,7 @@ const auth = useAuthStore()
 const open = ref(false)
 const scrolled = ref(false)
 
-const isAuthPage = computed(
-  () => route.name === 'login' || route.name === 'register',
-)
-
-const navSolid = computed(() => scrolled.value || open.value || isAuthPage.value)
+const navSolid = computed(() => scrolled.value || open.value || route.path !== '/')
 
 function onScroll() {
   scrolled.value = window.scrollY > 12

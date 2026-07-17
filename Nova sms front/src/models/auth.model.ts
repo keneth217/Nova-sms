@@ -39,6 +39,7 @@ export interface AuthResponse {
   fullName: string
   role: UserRole
   organizationId: string | null
+  organizationName?: string | null
   accountType?: OrganizationAccountType | null
   expiresAt?: string | null
 }
@@ -50,6 +51,21 @@ export interface OrganizationRegisterRequest {
   password: string
   adminFullName: string
   accountType: OrganizationAccountType
+  termsAccepted: boolean
+}
+
+export interface ChangePasswordRequest {
+  currentPassword: string
+  newPassword: string
+}
+
+export interface ForgotPasswordRequest {
+  email: string
+}
+
+export interface ResetPasswordRequest {
+  token: string
+  newPassword: string
 }
 
 export interface AuthUser {
@@ -58,6 +74,7 @@ export interface AuthUser {
   fullName: string
   role: UserRole
   organizationId: string | null
+  organizationName?: string | null
   accountType?: OrganizationAccountType | null
   expiresAt?: string | null
 }

@@ -3,8 +3,8 @@ spring:
     name: novastack-sms
   datasource:
     url: jdbc:mysql://localhost:3306/novastack_sms?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
-    username: Samis
-    password: 5am15.tl
+    username: keneth
+    password: korir123
     driver-class-name: com.mysql.cj.jdbc.Driver
   jpa:
     hibernate:
@@ -24,6 +24,17 @@ spring:
     multipart:
       max-file-size: 10MB
       max-request-size: 10MB
+  mail:
+    host: ${MAIL_HOST:localhost}
+    port: ${MAIL_PORT:25}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: ${MAIL_SMTP_AUTH:false}
+          starttls:
+            enable: ${MAIL_STARTTLS:false}
 
 server:
   port: 8092
@@ -42,11 +53,16 @@ springdoc:
     operationsSorter: method
 
 novastack:
+  frontend:
+    base-url: ${FRONTEND_BASE_URL:http://localhost:5173}
+  mail:
+    enabled: ${MAIL_ENABLED:false}
+    from: ${MAIL_FROM:no-reply@novasms.local}
   jwt:
     secret: NovastackSmsGatewayJwtSecretKeyThatIsLongEnoughForHS256ProductionUse2026
     expiration-ms: 86400000
   sms:
-    default-cost: 0.80
+    default-cost: 1.00
     platform-sender-id: NOVASTACK
     max-retries: 3
   africastalking:
@@ -59,16 +75,16 @@ novastack:
     passkey: ${MPESA_PASSKEY:}
     consumer-key: ${MPESA_CONSUMER_KEY:}
     consumer-secret: ${MPESA_CONSUMER_SECRET:}
-    callback-base-url: ${MPESA_CALLBACK_BASE_URL:https://localhost:8080}
+    callback-base-url: ${MPESA_CALLBACK_BASE_URL:https://smsapi.novastack.co.ke}
     base-url: ${MPESA_BASE_URL:https://sandbox.safaricom.co.ke}
     account-reference-prefix: NOVA
     transaction-desc: Novastack SMS top-up
   scheduler:
     fixed-delay-ms: 30000
   super-admin:
-    email: ${SUPER_ADMIN_EMAIL:admin@novastack.com}
-    password: ${SUPER_ADMIN_PASSWORD:ChangeMe123!}
-    full-name: Novastack Super Admin
+    email: ${SUPER_ADMIN_EMAIL:kipyegonkeneth03@gmail.com}
+    password: ${SUPER_ADMIN_PASSWORD:Designer@3689.}
+    full-name: Keneth Kipyegon
   organization:
     event-active-days: ${ORG_EVENT_ACTIVE_DAYS:7}
 

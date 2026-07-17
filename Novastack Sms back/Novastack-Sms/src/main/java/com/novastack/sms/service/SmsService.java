@@ -146,6 +146,11 @@ public class SmsService {
                 .map(this::toResponse);
     }
 
+    @Transactional(readOnly = true)
+    public Page<SmsMessageResponse> platformHistory(Pageable pageable) {
+        return smsMessageRepository.findAllByOrderByCreatedAtDesc(pageable).map(this::toResponse);
+    }
+
     private Set<String> resolveRecipients(UUID organizationId, List<String> recipients, UUID groupId) {
         Set<String> result = new LinkedHashSet<>();
         if (recipients != null) {

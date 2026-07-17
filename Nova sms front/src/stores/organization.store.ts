@@ -2,18 +2,51 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import type {
   AdminOrganization,
+  Organization,
   OrganizationStatus,
   PlatformOverview,
 } from '@/models/organization.model'
 import { organizationService } from '@/api/organization.service'
 
+const ORG_NAME_KEY = 'nova_sms_org_name'
+
+function loadStoredOrgName(): string {
+  try {
+    return localStorage.getItem(ORG_NAME_KEY) || ''
+  } catch {
+    return ''
+  }
+}
+
 export const useOrganizationStore = defineStore('organization', () => {
   const organizations = ref<AdminOrganization[]>([])
   const overview = ref<PlatformOverview | null>(null)
-  const organizationName = ref('')
+  const currentOrganization = ref<Organization | null>(null)
+  const organizationName = ref(loadStoredOrgName())
   const loading = ref(false)
   const error = ref<string | null>(null)
   const totalElements = ref(0)
+
+  function setOrganizationName(name: string) {
+    organizationName.value = name
+    if (name) localStorage.setItem(ORG_NAME_KEY, name)
+    else localStorage.removeItem(ORG_NAME_KEY)
+  }
+
+  async function fetchCurrentOrganization() {
+    loading.value = true
+    error.value = null
+    try {
+      currentOrganization.value = await organizationService.getCurrent()
+      setOrganizationName(currentOrganization.value.name)
+      return currentOrganization.value
+    } catch (e) {
+      error.value = e instanceof Error ? e.message : 'Failed to load organization'
+      throw e
+    } finally {
+      loading.value = false
+    }
+  }
 
   async function fetchOverview() {
     loading.value = true
@@ -55,20 +88,24 @@ export const useOrganizationStore = defineStore('organization', () => {
     return updated
   }
 
-  function setOrganizationName(name: string) {
-    organizationName.value = name
+  function clearCurrentOrganization() {
+    currentOrganization.value = null
+    setOrganizationName('')
   }
 
   return {
     organizations,
     overview,
+    currentOrganization,
     organizationName,
     loading,
     error,
     totalElements,
+    fetchCurrentOrganization,
     fetchOverview,
     fetchOrganizations,
     updateStatus,
     setOrganizationName,
+    clearCurrentOrganization,
   }
 })

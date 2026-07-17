@@ -60,7 +60,7 @@ public class Organization {
 
     @Column(name = "sms_cost", nullable = false, precision = 10, scale = 4)
     @Builder.Default
-    private BigDecimal smsCost = new BigDecimal("0.80");
+    private BigDecimal smsCost = new BigDecimal("1.00");
 
     @Column(name = "at_username", length = 100)
     private String atUsername;

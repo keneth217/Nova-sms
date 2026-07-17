@@ -15,6 +15,7 @@ import {
   BanknotesIcon,
   SignalIcon,
   PresentationChartLineIcon,
+  UserCircleIcon,
   XMarkIcon,
 } from '@heroicons/vue/24/outline'
 import { useAuthStore } from '@/stores/auth.store'
@@ -34,6 +35,7 @@ const orgLinks = [
   { to: '/sender-ids', label: 'Sender IDs', icon: IdentificationIcon },
   { to: '/sms-history', label: 'SMS History', icon: ClockIcon },
   { to: '/reports', label: 'Reports', icon: ChartBarIcon },
+  { to: '/profile', label: 'Profile', icon: UserCircleIcon },
   { to: '/settings', label: 'Settings', icon: Cog6ToothIcon },
 ]
 
@@ -43,6 +45,7 @@ const adminLinks = [
   { to: '/admin/topups', label: 'Wallet Funding', icon: BanknotesIcon },
   { to: '/admin/sms-monitoring', label: 'SMS Monitoring', icon: SignalIcon },
   { to: '/sender-ids', label: 'Sender IDs', icon: IdentificationIcon },
+  { to: '/profile', label: 'Profile', icon: UserCircleIcon },
   { to: '/settings', label: 'Settings', icon: Cog6ToothIcon },
 ]
 

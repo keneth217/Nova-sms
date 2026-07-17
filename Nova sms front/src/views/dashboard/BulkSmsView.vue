@@ -10,7 +10,7 @@ import AppButton from '@/components/common/AppButton.vue'
 import AppInput from '@/components/common/AppInput.vue'
 import AppSelect from '@/components/common/AppSelect.vue'
 import FormField from '@/components/common/FormField.vue'
-import { estimateSmsCost, formatCurrency, parsePhoneList, smsPageCount } from '@/utils/format'
+import { estimateSmsCost, formatCurrency, formatDate, parsePhoneList, smsPageCount } from '@/utils/format'
 
 const sms = useSmsStore()
 const wallet = useWalletStore()
@@ -24,6 +24,8 @@ const form = reactive({
   pasteNumbers: '',
   groupId: '',
   message: '',
+  sendLater: false,
+  scheduledAt: '',
 })
 
 const recipients = computed(() => parsePhoneList(form.pasteNumbers))
@@ -36,6 +38,12 @@ const recipientCount = computed(() => {
 const pages = computed(() => smsPageCount(form.message))
 const cost = computed(() => estimateSmsCost(form.message, recipientCount.value, wallet.smsCost))
 const approvedSenders = computed(() => sms.senderIds.filter((s) => s.status === 'APPROVED'))
+
+const minScheduleLocal = computed(() => {
+  const d = new Date(Date.now() + 60_000)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+})
 
 onMounted(async () => {
   await Promise.all([sms.fetchSenderIds(), wallet.fetchBalance()])
@@ -65,13 +73,32 @@ async function onSubmit() {
   success.value = ''
   error.value = ''
   try {
-    const result = await sms.sendBulk({
+    const payload = {
       senderId: form.senderId || undefined,
       message: form.message,
       recipients: form.groupId ? undefined : recipients.value,
       groupId: form.groupId || undefined,
-    })
-    success.value = `Campaign queued: ${result.queuedCount} messages (batch ${result.batchId}).`
+    }
+
+    if (form.sendLater) {
+      if (!form.scheduledAt) {
+        error.value = 'Choose a date and time for the reminder.'
+        return
+      }
+      const when = new Date(form.scheduledAt)
+      if (Number.isNaN(when.getTime()) || when.getTime() <= Date.now()) {
+        error.value = 'Reminder time must be in the future.'
+        return
+      }
+      const result = await sms.scheduleSms({
+        ...payload,
+        scheduledAt: when.toISOString(),
+      })
+      success.value = `Reminder scheduled for ${formatDate(when.toISOString())}: ${result.queuedCount} messages (batch ${result.batchId}).`
+    } else {
+      const result = await sms.sendBulk(payload)
+      success.value = `Campaign queued: ${result.queuedCount} messages (batch ${result.batchId}).`
+    }
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Campaign failed'
   }
@@ -82,7 +109,7 @@ async function onSubmit() {
   <div>
     <PageHeader
       title="Bulk SMS"
-      description="Launch campaigns from CSV, pasted numbers, or contact groups."
+      description="Launch campaigns now, or schedule reminders for a later date."
     />
 
     <div class="grid gap-6 lg:grid-cols-3">
@@ -130,15 +157,44 @@ async function onSubmit() {
             <AppInput v-model="form.message" type="textarea" :rows="5" />
           </FormField>
 
+          <div class="rounded-xl border border-slate-200 bg-slate-50/80 p-4">
+            <label class="flex cursor-pointer items-start gap-3">
+              <input
+                v-model="form.sendLater"
+                type="checkbox"
+                class="mt-1 h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+              />
+              <span>
+                <span class="block text-sm font-semibold text-slate-900">Schedule reminder</span>
+                <span class="mt-0.5 block text-xs text-slate-500">
+                  Queue this campaign to send automatically later.
+                </span>
+              </span>
+            </label>
+            <FormField
+              v-if="form.sendLater"
+              class="mt-4"
+              label="Send at"
+              required
+              hint="Local time — must be in the future"
+            >
+              <AppInput
+                v-model="form.scheduledAt"
+                type="datetime-local"
+                :min="minScheduleLocal"
+              />
+            </FormField>
+          </div>
+
           <p v-if="success" class="text-sm text-emerald-700">{{ success }}</p>
           <p v-if="error" class="text-sm text-rose-600">{{ error }}</p>
 
           <AppButton
             type="submit"
             :loading="sms.loading"
-            :disabled="!form.message || recipientCount === 0"
+            :disabled="!form.message || recipientCount === 0 || (form.sendLater && !form.scheduledAt)"
           >
-            Send campaign
+            {{ form.sendLater ? 'Schedule reminder' : 'Send campaign' }}
           </AppButton>
         </form>
       </AppCard>
@@ -161,6 +217,9 @@ async function onSubmit() {
             <dt class="text-slate-500">Estimated total</dt>
             <dd class="text-lg font-semibold text-brand-700">{{ formatCurrency(cost) }}</dd>
           </div>
+          <p v-if="form.sendLater && form.scheduledAt" class="text-xs text-slate-500">
+            Will send {{ formatDate(new Date(form.scheduledAt).toISOString()) }}
+          </p>
         </dl>
       </AppCard>
     </div>

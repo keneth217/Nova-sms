@@ -12,12 +12,15 @@ import com.novastack.sms.domain.enums.UserRole;
 import com.novastack.sms.domain.repository.OrganizationRepository;
 import com.novastack.sms.domain.repository.SenderIdRepository;
 import com.novastack.sms.domain.repository.UserRepository;
+import com.novastack.sms.dto.request.ChangePasswordRequest;
 import com.novastack.sms.dto.request.LoginRequest;
 import com.novastack.sms.dto.request.OrganizationRegisterRequest;
 import com.novastack.sms.dto.response.AuthResponse;
 import com.novastack.sms.dto.response.OrganizationResponse;
+import com.novastack.sms.dto.response.UserResponse;
 import com.novastack.sms.exception.ApiException;
 import com.novastack.sms.security.JwtService;
+import com.novastack.sms.security.SecurityUtils;
 import com.novastack.sms.security.UserPrincipal;
 import com.novastack.sms.util.PhoneNormalizer;
 import lombok.RequiredArgsConstructor;
@@ -86,6 +89,7 @@ public class AuthService {
         // Prepaid wallet for M-Pesa top-ups and SMS sending
         var wallet = walletService.createForOrganization(organization);
 
+        Instant acceptedAt = Instant.now();
         User admin = User.builder()
                 .email(request.getEmail())
                 .password(passwordEncoder.encode(request.getPassword()))
@@ -93,6 +97,9 @@ public class AuthService {
                 .role(UserRole.ORGANIZATION_ADMIN)
                 .organization(organization)
                 .enabled(true)
+                .termsAccepted(true)
+                .termsAcceptedAt(acceptedAt)
+                .privacyAcceptedAt(acceptedAt)
                 .build();
         userRepository.save(admin);
 
@@ -128,9 +135,59 @@ public class AuthService {
                 .fullName(user.getFullName())
                 .role(user.getRole())
                 .organizationId(organization != null ? organization.getId() : null)
+                .organizationName(organization != null ? organization.getName() : null)
                 .accountType(organization != null ? organization.getAccountType() : null)
                 .expiresAt(organization != null ? organization.getExpiresAt() : null)
                 .build();
+    }
+
+    @Transactional(readOnly = true)
+    public OrganizationResponse getCurrentOrganization() {
+        UUID organizationId = SecurityUtils.requireOrganizationId();
+        Organization organization = organizationRepository.findById(organizationId)
+                .orElseThrow(() -> new ApiException("Organization not found", HttpStatus.NOT_FOUND));
+        Wallet wallet = walletService.ensureWallet(organizationId);
+        Integer activeDays = null;
+        if (organization.getAccountType() == OrganizationAccountType.EVENT
+                && organization.getExpiresAt() != null) {
+            long days = ChronoUnit.DAYS.between(Instant.now(), organization.getExpiresAt());
+            activeDays = (int) Math.max(0, days);
+        }
+        return toOrgResponse(organization, activeDays, wallet);
+    }
+
+    @Transactional(readOnly = true)
+    public UserResponse getCurrentProfile() {
+        UserPrincipal principal = SecurityUtils.currentUser();
+        if (principal.getId() == null || principal.isApiKeyAuth()) {
+            throw new ApiException("User profile requires JWT authentication", HttpStatus.FORBIDDEN);
+        }
+        User user = userRepository.findByIdWithOrganization(principal.getId())
+                .orElseThrow(() -> new ApiException("User not found", HttpStatus.NOT_FOUND));
+        return toUserResponse(user);
+    }
+
+    @Transactional
+    public void changePassword(ChangePasswordRequest request) {
+        UserPrincipal principal = SecurityUtils.currentUser();
+        if (principal.getId() == null || principal.isApiKeyAuth()) {
+            throw new ApiException("Password change requires JWT authentication", HttpStatus.FORBIDDEN);
+        }
+        User user = userRepository.findById(principal.getId())
+                .orElseThrow(() -> new ApiException("User not found", HttpStatus.NOT_FOUND));
+
+        if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
+            throw new ApiException("Current password is incorrect", HttpStatus.BAD_REQUEST);
+        }
+        if (passwordEncoder.matches(request.getNewPassword(), user.getPassword())) {
+            throw new ApiException(
+                    "New password must be different from the current password",
+                    HttpStatus.BAD_REQUEST);
+        }
+
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        user.setTokenVersion(user.getTokenVersion() + 1);
+        userRepository.save(user);
     }
 
     private Optional<User> resolveUser(String identifier) {
@@ -210,6 +267,20 @@ public class AuthService {
                 .walletId(wallet != null ? wallet.getId() : null)
                 .walletBalance(wallet != null ? wallet.getBalance() : null)
                 .walletCurrency(wallet != null ? wallet.getCurrency() : "KES")
+                .build();
+    }
+
+    private UserResponse toUserResponse(User user) {
+        Organization organization = user.getOrganization();
+        return UserResponse.builder()
+                .id(user.getId())
+                .email(user.getEmail())
+                .fullName(user.getFullName())
+                .role(user.getRole())
+                .enabled(user.isEnabled())
+                .organizationId(organization != null ? organization.getId() : null)
+                .organizationName(organization != null ? organization.getName() : null)
+                .createdAt(user.getCreatedAt())
                 .build();
     }
 }

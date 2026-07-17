@@ -8,6 +8,7 @@ import type {
   WalletTransaction,
 } from '@/models/wallet.model'
 import { walletService } from '@/api/wallet.service'
+import { useAuthStore } from '@/stores/auth.store'
 
 export const useWalletStore = defineStore('wallet', () => {
   const balance = ref<WalletBalance | null>(null)
@@ -18,10 +19,11 @@ export const useWalletStore = defineStore('wallet', () => {
   const error = ref<string | null>(null)
 
   const formattedBalance = computed(() => balance.value?.balance ?? 0)
-  const smsCost = computed(() => balance.value?.smsCost ?? 0.8)
+  const smsCost = computed(() => balance.value?.smsCost ?? 1)
   const currency = computed(() => balance.value?.currency ?? 'KES')
 
   async function fetchBalance() {
+    if (useAuthStore().isSuperAdmin) return
     loading.value = true
     error.value = null
     try {
@@ -35,6 +37,7 @@ export const useWalletStore = defineStore('wallet', () => {
   }
 
   async function fetchTransactions(page = 0, size = 20) {
+    if (useAuthStore().isSuperAdmin) return
     loading.value = true
     error.value = null
     try {

@@ -3,13 +3,18 @@ import { computed, ref } from 'vue'
 import type {
   AuthResponse,
   AuthUser,
+  ChangePasswordRequest,
+  ForgotPasswordRequest,
   LoginRequest,
   OrganizationRegisterRequest,
+  ResetPasswordRequest,
   UserRole,
 } from '@/models/auth.model'
 import type { Organization } from '@/models/organization.model'
+import type { User } from '@/models/user.model'
 import { authService } from '@/api/auth.service'
 import { authUserFromResponse } from '@/mocks/data'
+import { useOrganizationStore } from '@/stores/organization.store'
 
 const TOKEN_KEY = 'nova_sms_token'
 const USER_KEY = 'nova_sms_user'
@@ -29,6 +34,7 @@ export const useAuthStore = defineStore('auth', () => {
   const loading = ref(false)
   const error = ref<string | null>(null)
   const registeredOrg = ref<Organization | null>(null)
+  const profile = ref<User | null>(null)
 
   const isAuthenticated = computed(() => Boolean(accessToken.value && user.value))
   const isSuperAdmin = computed(() => user.value?.role === 'SUPER_ADMIN')
@@ -41,6 +47,9 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = authUserFromResponse(auth)
     localStorage.setItem(TOKEN_KEY, auth.accessToken)
     localStorage.setItem(USER_KEY, JSON.stringify(user.value))
+    if (auth.organizationName) {
+      useOrganizationStore().setOrganizationName(auth.organizationName)
+    }
   }
 
   async function login(payload: LoginRequest) {
@@ -49,6 +58,13 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       const auth = await authService.login(payload)
       persist(auth)
+      if (auth.organizationId && !auth.organizationName) {
+        try {
+          await useOrganizationStore().fetchCurrentOrganization()
+        } catch {
+          void 0
+        }
+      }
       return auth
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Login failed'
@@ -84,11 +100,78 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  async function fetchProfile() {
+    loading.value = true
+    error.value = null
+    try {
+      profile.value = await authService.getProfile()
+      if (user.value) {
+        user.value = {
+          ...user.value,
+          userId: profile.value.id,
+          email: profile.value.email,
+          fullName: profile.value.fullName,
+          role: profile.value.role,
+          organizationId: profile.value.organizationId,
+          organizationName: profile.value.organizationName,
+        }
+        localStorage.setItem(USER_KEY, JSON.stringify(user.value))
+      }
+      return profile.value
+    } catch (e) {
+      error.value = e instanceof Error ? e.message : 'Failed to load profile'
+      throw e
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function changePassword(payload: ChangePasswordRequest) {
+    loading.value = true
+    error.value = null
+    try {
+      return await authService.changePassword(payload)
+    } catch (e) {
+      error.value = e instanceof Error ? e.message : 'Failed to change password'
+      throw e
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function forgotPassword(payload: ForgotPasswordRequest) {
+    loading.value = true
+    error.value = null
+    try {
+      return await authService.forgotPassword(payload)
+    } catch (e) {
+      error.value = e instanceof Error ? e.message : 'Failed to request password reset'
+      throw e
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function resetPassword(payload: ResetPasswordRequest) {
+    loading.value = true
+    error.value = null
+    try {
+      return await authService.resetPassword(payload)
+    } catch (e) {
+      error.value = e instanceof Error ? e.message : 'Failed to reset password'
+      throw e
+    } finally {
+      loading.value = false
+    }
+  }
+
   function logout(silent = false) {
     accessToken.value = null
     user.value = null
+    profile.value = null
     localStorage.removeItem(TOKEN_KEY)
     localStorage.removeItem(USER_KEY)
+    useOrganizationStore().clearCurrentOrganization()
     if (!silent) error.value = null
   }
 
@@ -102,6 +185,7 @@ export const useAuthStore = defineStore('auth', () => {
     loading,
     error,
     registeredOrg,
+    profile,
     isAuthenticated,
     isSuperAdmin,
     isOrgAdmin,
@@ -110,6 +194,10 @@ export const useAuthStore = defineStore('auth', () => {
     login,
     register,
     tryRefreshToken,
+    fetchProfile,
+    changePassword,
+    forgotPassword,
+    resetPassword,
     logout,
     hasRole,
   }

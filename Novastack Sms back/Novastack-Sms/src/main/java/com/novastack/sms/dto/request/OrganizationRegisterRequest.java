@@ -1,6 +1,7 @@
 package com.novastack.sms.dto.request;
 
 import com.novastack.sms.domain.enums.OrganizationAccountType;
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -35,4 +36,11 @@ public class OrganizationRegisterRequest {
      * Defaults to BUSINESS when omitted.
      */
     private OrganizationAccountType accountType = OrganizationAccountType.BUSINESS;
+
+    private boolean termsAccepted;
+
+    @AssertTrue(message = "You must accept the Terms of Service, Privacy Policy, and Acceptable Use Policy")
+    public boolean isLegalAccepted() {
+        return termsAccepted;
+    }
 }

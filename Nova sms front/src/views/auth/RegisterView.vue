@@ -23,6 +23,7 @@ const form = reactive({
   password: '',
   adminFullName: '',
 })
+const termsAccepted = ref(false)
 const success = ref(false)
 const apiKey = ref('')
 const localError = ref('')
@@ -69,10 +70,15 @@ function setIntent(next: Intent) {
 
 async function onSubmit() {
   localError.value = ''
+  if (!termsAccepted.value) {
+    localError.value = 'Please accept the Terms of Service, Privacy Policy, and Acceptable Use Policy.'
+    return
+  }
   try {
     const org = await auth.register({
       ...form,
       accountType: isEvent.value ? 'EVENT' : 'BUSINESS',
+      termsAccepted: true,
     })
     apiKey.value = org.apiKey
     success.value = true
@@ -169,11 +175,38 @@ async function goLogin() {
               <AppInput v-model="form.password" type="password" placeholder="••••••••" />
             </FormField>
 
+            <label class="flex items-start gap-3 text-sm text-slate-600">
+              <input
+                v-model="termsAccepted"
+                type="checkbox"
+                class="mt-1 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+              />
+              <span>
+                I have read and agree to the
+                <RouterLink to="/terms" class="font-medium text-brand-700 hover:underline" target="_blank">
+                  Terms of Service
+                </RouterLink>,
+                <RouterLink to="/privacy" class="font-medium text-brand-700 hover:underline" target="_blank">
+                  Privacy Policy
+                </RouterLink>,
+                and
+                <RouterLink
+                  to="/acceptable-use"
+                  class="font-medium text-brand-700 hover:underline"
+                  target="_blank"
+                >
+                  Acceptable Use Policy
+                </RouterLink>.
+              </span>
+            </label>
+
             <p v-if="localError || auth.error" class="text-sm text-rose-600">
               {{ localError || auth.error }}
             </p>
 
-            <AppButton type="submit" block :loading="auth.loading">{{ copy.submit }}</AppButton>
+            <AppButton type="submit" block :loading="auth.loading" :disabled="!termsAccepted">
+              {{ copy.submit }}
+            </AppButton>
           </form>
 
           <p class="mt-6 text-center text-sm text-slate-500">

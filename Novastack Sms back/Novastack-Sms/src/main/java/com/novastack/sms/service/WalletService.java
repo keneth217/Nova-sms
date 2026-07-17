@@ -464,6 +464,20 @@ public class WalletService {
                 .map(tx -> toTransactionResponse(tx, organizationId));
     }
 
+    public Page<WalletTransactionResponse> platformHistory(
+            WalletTransactionType type,
+            List<TopupStatus> statuses,
+            Pageable pageable) {
+        boolean statusesEmpty = statuses == null || statuses.isEmpty();
+        Collection<TopupStatus> statusFilter = statusesEmpty
+                ? List.of(TopupStatus.PENDING)
+                : statuses;
+
+        return walletTransactionRepository
+                .findPlatformFiltered(type, statusFilter, statusesEmpty, pageable)
+                .map(tx -> toTransactionResponse(tx, tx.getOrganization().getId()));
+    }
+
     private WalletTransactionResponse toTransactionResponse(WalletTransaction tx, UUID organizationId) {
         return WalletTransactionResponse.builder()
                 .id(tx.getId())

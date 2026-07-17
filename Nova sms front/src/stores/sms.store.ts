@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import type {
   BulkSmsRequest,
   BulkSmsResponse,
+  ScheduleSmsRequest,
   SendSmsRequest,
   SmsHistoryFilters,
   SmsMessage,
@@ -93,6 +94,20 @@ export const useSmsStore = defineStore('sms', () => {
     }
   }
 
+  async function scheduleSms(payload: ScheduleSmsRequest) {
+    loading.value = true
+    error.value = null
+    try {
+      lastBulk.value = await smsService.schedule(payload)
+      return lastBulk.value
+    } catch (e) {
+      error.value = e instanceof Error ? e.message : 'Schedule failed'
+      throw e
+    } finally {
+      loading.value = false
+    }
+  }
+
   async function requestSenderId(senderName: string) {
     loading.value = true
     error.value = null
@@ -121,6 +136,7 @@ export const useSmsStore = defineStore('sms', () => {
     fetchSenderIds,
     sendSms,
     sendBulk,
+    scheduleSms,
     requestSenderId,
   }
 })

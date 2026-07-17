@@ -21,11 +21,12 @@ public class UserPrincipal implements UserDetails {
     private final UserRole role;
     private final UUID organizationId;
     private final boolean enabled;
+    private final long tokenVersion;
     private final String apiKey;
     private final boolean apiKeyAuth;
 
     private UserPrincipal(UUID id, String email, String password, String fullName, UserRole role,
-                          UUID organizationId, boolean enabled, String apiKey, boolean apiKeyAuth) {
+                          UUID organizationId, boolean enabled, long tokenVersion, String apiKey, boolean apiKeyAuth) {
         this.id = id;
         this.email = email;
         this.password = password;
@@ -33,6 +34,7 @@ public class UserPrincipal implements UserDetails {
         this.role = role;
         this.organizationId = organizationId;
         this.enabled = enabled;
+        this.tokenVersion = tokenVersion;
         this.apiKey = apiKey;
         this.apiKeyAuth = apiKeyAuth;
     }
@@ -46,6 +48,7 @@ public class UserPrincipal implements UserDetails {
                 user.getRole(),
                 user.getOrganization() != null ? user.getOrganization().getId() : null,
                 user.isEnabled(),
+                user.getTokenVersion(),
                 null,
                 false
         );
@@ -60,6 +63,7 @@ public class UserPrincipal implements UserDetails {
                 UserRole.ORGANIZATION_ADMIN,
                 organizationId,
                 true,
+                0L,
                 apiKey,
                 true
         );

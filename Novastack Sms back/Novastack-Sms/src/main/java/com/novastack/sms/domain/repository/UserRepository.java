@@ -15,6 +15,8 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     Optional<User> findByEmail(String email);
 
+    Optional<User> findByEmailIgnoreCase(String email);
+
     @Query("SELECT u FROM User u LEFT JOIN FETCH u.organization WHERE u.email = :email")
     Optional<User> findByEmailWithOrganization(@Param("email") String email);
 

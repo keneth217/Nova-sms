@@ -250,7 +250,7 @@ Frontend tip: after top-up, poll `POST .../check` every 3–5 seconds until `cal
 | `MPESA_PASSKEY` | Lipa Na M-Pesa Online passkey |
 | `MPESA_CONSUMER_KEY` | Daraja app consumer key |
 | `MPESA_CONSUMER_SECRET` | Daraja app consumer secret |
-| `MPESA_CALLBACK_BASE_URL` | Public HTTPS base URL (e.g. `https://api.yourdomain.com`) |
+| `MPESA_CALLBACK_BASE_URL` | Public HTTPS base URL (e.g. `https://smsapi.novastack.co.ke`) |
 | `MPESA_BASE_URL` | `https://sandbox.safaricom.co.ke` or `https://api.safaricom.co.ke` |
 
 Register this callback in Daraja / ensure it is reachable:
@@ -286,7 +286,7 @@ Messages are saved as `QUEUED`, then delivered immediately via Africa's Talking 
 In Africa's Talking, set the delivery report callback to:
 
 ```
-https://<your-host>/api/v1/dlr/callback
+https://smsapi.novastack.co.ke/api/v1/dlr/callback
 ```
 
 ## Architecture
@@ -309,7 +309,7 @@ Client (JWT / API Key)
 
 ### Wallet rules
 
-- SMS cost is per organization (`sms_cost`, default `0.80` KES)
+- SMS cost billed to the customer is per organization (`sms_cost`, default `1.00` KES); the provider (Africa's Talking) cost is the platform's own margin cost
 - Balance is checked before sending
 - Debit happens at send time; failed sends after max retries are refunded
 - Optimistic/pessimistic locking on wallet updates (`@Version` + `PESSIMISTIC_WRITE`)

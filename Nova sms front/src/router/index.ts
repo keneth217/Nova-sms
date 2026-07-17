@@ -35,7 +35,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/',
     component: () => import('@/layouts/MarketingLayout.vue'),
-    meta: { layout: 'marketing', guestOnly: true },
+    meta: { layout: 'marketing' },
     children: [
       {
         path: '',
@@ -54,6 +54,36 @@ const routes: RouteRecordRaw[] = [
         name: 'register',
         component: () => import('@/views/auth/RegisterView.vue'),
         meta: { guestOnly: true, title: 'Create account' },
+      },
+      {
+        path: 'forgot-password',
+        name: 'forgot-password',
+        component: () => import('@/views/auth/ForgotPasswordView.vue'),
+        meta: { guestOnly: true, title: 'Forgot password' },
+      },
+      {
+        path: 'reset-password',
+        name: 'reset-password',
+        component: () => import('@/views/auth/ResetPasswordView.vue'),
+        meta: { guestOnly: true, title: 'Reset password' },
+      },
+      {
+        path: 'terms',
+        name: 'terms',
+        component: () => import('@/views/legal/TermsView.vue'),
+        meta: { title: 'Terms of Service' },
+      },
+      {
+        path: 'privacy',
+        name: 'privacy',
+        component: () => import('@/views/legal/PrivacyView.vue'),
+        meta: { title: 'Privacy Policy' },
+      },
+      {
+        path: 'acceptable-use',
+        name: 'acceptable-use',
+        component: () => import('@/views/legal/AcceptableUseView.vue'),
+        meta: { title: 'Acceptable Use Policy' },
       },
     ],
   },
@@ -117,6 +147,16 @@ const routes: RouteRecordRaw[] = [
         name: 'reports',
         component: () => import('@/views/dashboard/ReportsView.vue'),
         meta: { requiresAuth: true, title: 'Reports', roles: ['ORGANIZATION_ADMIN'] },
+      },
+      {
+        path: 'profile',
+        name: 'profile',
+        component: () => import('@/views/dashboard/ProfileView.vue'),
+        meta: {
+          requiresAuth: true,
+          title: 'Profile',
+          roles: ['ORGANIZATION_ADMIN', 'SUPER_ADMIN'],
+        },
       },
       {
         path: 'settings',

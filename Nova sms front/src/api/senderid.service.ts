@@ -10,7 +10,9 @@ class SenderIdService {
       await delay(250)
       return [...mockSenderIds]
     }
-    const { data } = await api.get<ApiResponse<SenderId[]>>('/sender-ids')
+    const { useAuthStore } = await import('@/stores/auth.store')
+    const path = useAuthStore().isSuperAdmin ? '/admin/sender-ids' : '/sender-ids'
+    const { data } = await api.get<ApiResponse<SenderId[]>>(path)
     if (!data.success || !data.data) throw new Error(data.message || 'Failed to load sender IDs')
     return data.data
   }

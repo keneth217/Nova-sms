@@ -41,6 +41,18 @@ public interface WalletTransactionRepository extends JpaRepository<WalletTransac
             Pageable pageable);
 
     @Query("""
+            SELECT t FROM WalletTransaction t
+            WHERE (:type IS NULL OR t.type = :type)
+              AND (:statusesEmpty = TRUE OR t.topupStatus IN :statuses)
+            ORDER BY t.createdAt DESC
+            """)
+    Page<WalletTransaction> findPlatformFiltered(
+            @Param("type") WalletTransactionType type,
+            @Param("statuses") Collection<TopupStatus> statuses,
+            @Param("statusesEmpty") boolean statusesEmpty,
+            Pageable pageable);
+
+    @Query("""
             SELECT COALESCE(SUM(t.amount), 0) FROM WalletTransaction t
             WHERE t.organization.id = :organizationId
               AND t.type = :type

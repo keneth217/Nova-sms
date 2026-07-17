@@ -2,10 +2,14 @@ import api from './axios'
 import type {
   ApiResponse,
   AuthResponse,
+  ChangePasswordRequest,
+  ForgotPasswordRequest,
   LoginRequest,
   OrganizationRegisterRequest,
+  ResetPasswordRequest,
 } from '@/models/auth.model'
 import type { Organization } from '@/models/organization.model'
+import type { User } from '@/models/user.model'
 import {
   delay,
   isMockMode,
@@ -93,6 +97,56 @@ class AuthService {
       throw new Error(data.message || 'Registration failed')
     }
     return data.data
+  }
+
+  async getProfile(): Promise<User> {
+    if (isMockMode()) {
+      await delay(200)
+      return {
+        id: mockOrgAdmin.userId,
+        email: mockOrgAdmin.email,
+        fullName: mockOrgAdmin.fullName,
+        role: mockOrgAdmin.role,
+        enabled: true,
+        organizationId: mockOrgAdmin.organizationId,
+        organizationName: mockOrgAdmin.organizationName ?? null,
+        createdAt: new Date().toISOString(),
+      }
+    }
+    const { data } = await api.get<ApiResponse<User>>('/auth/me')
+    if (!data.success || !data.data) throw new Error(data.message || 'Failed to load profile')
+    return data.data
+  }
+
+  async changePassword(payload: ChangePasswordRequest): Promise<string> {
+    if (isMockMode()) {
+      await delay(300)
+      if (payload.currentPassword.length < 6) throw new Error('Current password is incorrect')
+      return 'Password changed successfully'
+    }
+    const { data } = await api.post<ApiResponse<null>>('/auth/change-password', payload)
+    if (!data.success) throw new Error(data.message || 'Failed to change password')
+    return data.message
+  }
+
+  async forgotPassword(payload: ForgotPasswordRequest): Promise<string> {
+    if (isMockMode()) {
+      await delay(300)
+      return 'If an account exists for that email, a password reset link has been sent.'
+    }
+    const { data } = await api.post<ApiResponse<null>>('/auth/forgot-password', payload)
+    if (!data.success) throw new Error(data.message || 'Failed to request password reset')
+    return data.message
+  }
+
+  async resetPassword(payload: ResetPasswordRequest): Promise<string> {
+    if (isMockMode()) {
+      await delay(300)
+      return 'Password reset successfully'
+    }
+    const { data } = await api.post<ApiResponse<null>>('/auth/reset-password', payload)
+    if (!data.success) throw new Error(data.message || 'Failed to reset password')
+    return data.message
   }
 
   async refreshToken(_token: string): Promise<AuthResponse | null> {

@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -28,5 +29,11 @@ public class OrganizationController {
     @Operation(summary = "Register a new organization and admin user")
     public ApiResponse<OrganizationResponse> register(@Valid @RequestBody OrganizationRegisterRequest request) {
         return ApiResponse.ok("Organization registered", authService.register(request));
+    }
+
+    @GetMapping("/me")
+    @Operation(summary = "Get the authenticated organization's details")
+    public ApiResponse<OrganizationResponse> currentOrganization() {
+        return ApiResponse.ok(authService.getCurrentOrganization());
     }
 }
