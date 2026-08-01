@@ -20,6 +20,9 @@ public interface SenderIdRepository extends JpaRepository<SenderId, UUID> {
 
     Optional<SenderId> findFirstByPlatformDefaultTrueAndStatus(SenderIdStatus status);
 
+    Optional<SenderId> findFirstByOrganizationIdAndStatusAndPlatformDefaultFalseOrderByCreatedAtAsc(
+            UUID organizationId, SenderIdStatus status);
+
     boolean existsByOrganizationIdAndSenderNameIgnoreCaseAndStatus(
             UUID organizationId, String senderName, SenderIdStatus status);
     long countByStatus(SenderIdStatus status);

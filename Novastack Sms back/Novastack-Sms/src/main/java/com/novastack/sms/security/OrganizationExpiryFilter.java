@@ -35,6 +35,7 @@ public class OrganizationExpiryFilter extends OncePerRequestFilter {
                 || path.startsWith("/api/v1/organizations/register")
                 || path.startsWith("/api/v1/dlr")
                 || path.startsWith("/api/v1/mpesa")
+                || path.startsWith("/api/v1/data-bundles")
                 || path.startsWith("/api/v1/admin")
                 || path.startsWith("/actuator")
                 || path.startsWith("/v3/api-docs")

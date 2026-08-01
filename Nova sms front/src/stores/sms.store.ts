@@ -46,7 +46,8 @@ export const useSmsStore = defineStore('sms', () => {
           (m) =>
             m.recipient.includes(q) ||
             m.content.toLowerCase().includes(q) ||
-            m.senderId.toLowerCase().includes(q),
+            m.senderId.toLowerCase().includes(q) ||
+            (m.organizationName || '').toLowerCase().includes(q),
         )
       }
       history.value = items

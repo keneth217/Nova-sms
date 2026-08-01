@@ -9,7 +9,7 @@ import FormField from '@/components/common/FormField.vue'
 import AppButton from '@/components/common/AppButton.vue'
 import DataTable from '@/components/tables/DataTable.vue'
 import EntityStatusBadge from '@/components/common/EntityStatusBadge.vue'
-import { formatCurrency, formatDate } from '@/utils/format'
+import { formatCurrency, formatDate, formatProviderError } from '@/utils/format'
 
 const sms = useSmsStore()
 
@@ -37,11 +37,10 @@ async function applyFilters() {
         <FormField label="Status">
           <AppSelect v-model="sms.filters.status" placeholder="All statuses">
             <option value="">All</option>
-            <option value="QUEUED">QUEUED</option>
-            <option value="SENT">SENT</option>
+            <option value="PENDING">PENDING</option>
+            <option value="SCHEDULED">SCHEDULED</option>
             <option value="DELIVERED">DELIVERED</option>
             <option value="FAILED">FAILED</option>
-            <option value="SCHEDULED">SCHEDULED</option>
           </AppSelect>
         </FormField>
         <FormField label="Sender ID">
@@ -71,7 +70,16 @@ async function applyFilters() {
       <tr v-for="row in sms.history" :key="row.id" class="hover:bg-slate-50/70">
         <td class="whitespace-nowrap px-4 py-3 font-mono text-xs">{{ row.recipient }}</td>
         <td class="whitespace-nowrap px-4 py-3">{{ row.senderId }}</td>
-        <td class="max-w-sm truncate px-4 py-3 text-slate-600">{{ row.content }}</td>
+        <td class="max-w-sm px-4 py-3 text-slate-600">
+          <p class="truncate">{{ row.content }}</p>
+          <p
+            v-if="row.status === 'FAILED' && row.failureReason"
+            class="mt-1 text-xs text-rose-600"
+            :title="row.failureReason"
+          >
+            {{ formatProviderError(row.failureReason) }}
+          </p>
+        </td>
         <td class="whitespace-nowrap px-4 py-3">{{ formatCurrency(row.cost) }}</td>
         <td class="px-4 py-3"><EntityStatusBadge :status="row.status" /></td>
         <td class="whitespace-nowrap px-4 py-3 text-slate-500">

@@ -28,11 +28,11 @@ const inputClass =
 
 <template>
   <textarea
-    v-if="type === 'textarea'"
-    :value="modelValue"
-    :rows="rows"
-    :placeholder="placeholder"
-    :disabled="disabled"
+    v-if="props.type === 'textarea'"
+    :value="props.modelValue"
+    :rows="props.rows"
+    :placeholder="props.placeholder"
+    :disabled="props.disabled"
     :class="inputClass"
     v-bind="$attrs"
     @input="$emit('update:modelValue', ($event.target as HTMLTextAreaElement).value)"
@@ -40,18 +40,18 @@ const inputClass =
   <div v-else class="relative">
     <input
       :type="inputType"
-      :value="modelValue"
-      :placeholder="placeholder"
-      :disabled="disabled"
-      :class="[inputClass, type === 'password' ? 'pr-10' : '']"
+      :value="props.modelValue"
+      :placeholder="props.placeholder"
+      :disabled="props.disabled"
+      :class="[inputClass, props.type === 'password' ? 'pr-10' : '']"
       v-bind="$attrs"
       @input="$emit('update:modelValue', ($event.target as HTMLInputElement).value)"
     />
     <button
-      v-if="type === 'password'"
+      v-if="props.type === 'password'"
       type="button"
       class="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-slate-400 transition hover:text-slate-700 disabled:cursor-not-allowed disabled:text-slate-300"
-      :disabled="disabled"
+      :disabled="props.disabled"
       :aria-label="passwordVisible ? 'Hide password' : 'Show password'"
       :title="passwordVisible ? 'Hide password' : 'Show password'"
       @click="passwordVisible = !passwordVisible"

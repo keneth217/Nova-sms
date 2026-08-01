@@ -77,6 +77,13 @@ function goEvents() {
         >
           Features
         </RouterLink>
+        <RouterLink
+          to="/data-bundles"
+          class="text-sm font-medium text-slate-600 transition hover:text-slate-900"
+          active-class="!text-slate-900"
+        >
+          Data bundles
+        </RouterLink>
       </nav>
 
       <div class="hidden items-center gap-3 md:flex">
@@ -146,6 +153,13 @@ function goEvents() {
           @click="goFeatures"
         >
           Features
+        </RouterLink>
+        <RouterLink
+          to="/data-bundles"
+          class="text-sm font-medium text-slate-600"
+          @click="open = false"
+        >
+          Data bundles
         </RouterLink>
         <hr class="border-slate-200" />
         <template v-if="auth.isAuthenticated">

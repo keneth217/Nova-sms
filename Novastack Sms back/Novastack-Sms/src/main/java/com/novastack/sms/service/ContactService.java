@@ -47,13 +47,17 @@ public class ContactService {
 
     @Transactional
     public ContactGroupResponse createGroup(UUID organizationId, ContactGroupRequest request) {
-        if (contactGroupRepository.existsByOrganizationIdAndNameIgnoreCase(organizationId, request.getName())) {
+        String name = request.getName() == null ? "" : request.getName().trim();
+        if (name.isEmpty()) {
+            throw new ApiException("Group name is required", HttpStatus.BAD_REQUEST);
+        }
+        if (contactGroupRepository.existsByOrganizationIdAndNameIgnoreCase(organizationId, name)) {
             throw new ApiException("Group name already exists", HttpStatus.CONFLICT);
         }
         ContactGroup group = contactGroupRepository.save(ContactGroup.builder()
                 .organization(organizationRepository.getReferenceById(organizationId))
-                .name(request.getName().trim())
-                .description(request.getDescription())
+                .name(name)
+                .description(blankToNull(request.getDescription()))
                 .build());
         return toGroupResponse(group, 0);
     }

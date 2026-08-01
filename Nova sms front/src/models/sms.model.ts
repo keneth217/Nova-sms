@@ -1,4 +1,4 @@
-export type MessageStatus = 'QUEUED' | 'SENT' | 'DELIVERED' | 'FAILED' | 'SCHEDULED'
+export type MessageStatus = 'PENDING' | 'SCHEDULED' | 'DELIVERED' | 'FAILED'
 
 export interface SendSmsRequest {
   recipient: string
@@ -23,6 +23,8 @@ export interface ScheduleSmsRequest {
 
 export interface SmsMessage {
   id: string
+  organizationId?: string | null
+  organizationName?: string | null
   recipient: string
   content: string
   senderId: string

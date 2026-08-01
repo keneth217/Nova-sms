@@ -1,26 +1,31 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useSmsStore } from '@/stores/sms.store'
 import { useWalletStore } from '@/stores/wallet.store'
 import { contactService } from '@/api/contact.service'
-import type { ContactGroup } from '@/models/contact.model'
+import type { Contact, ContactGroup } from '@/models/contact.model'
 import PageHeader from '@/components/common/PageHeader.vue'
 import AppCard from '@/components/common/AppCard.vue'
 import AppButton from '@/components/common/AppButton.vue'
 import AppInput from '@/components/common/AppInput.vue'
 import AppSelect from '@/components/common/AppSelect.vue'
 import FormField from '@/components/common/FormField.vue'
-import { estimateSmsCost, formatCurrency, formatDate, parsePhoneList, smsPageCount } from '@/utils/format'
+import ContactPicker from '@/components/common/ContactPicker.vue'
+import { estimateSmsCost, formatCurrency, formatDate, parsePhoneList, smsPageCount, summarizeBulkSmsResult } from '@/utils/format'
+
+type RecipientSource = 'contacts' | 'group' | 'manual'
 
 const sms = useSmsStore()
 const wallet = useWalletStore()
 const groups = ref<ContactGroup[]>([])
+const contacts = ref<Contact[]>([])
+const selectedContactIds = ref<string[]>([])
+const recipientSource = ref<RecipientSource>('contacts')
 const success = ref('')
 const error = ref('')
 const csvHint = ref('')
 
 const form = reactive({
-  senderId: '',
   pasteNumbers: '',
   groupId: '',
   message: '',
@@ -28,16 +33,25 @@ const form = reactive({
   scheduledAt: '',
 })
 
-const recipients = computed(() => parsePhoneList(form.pasteNumbers))
+const pastedRecipients = computed(() => parsePhoneList(form.pasteNumbers))
+
+const selectedContactPhones = computed(() => {
+  const selected = new Set(selectedContactIds.value)
+  return contacts.value.filter((c) => selected.has(c.id)).map((c) => c.phone)
+})
+
 const recipientCount = computed(() => {
-  if (form.groupId) {
+  if (recipientSource.value === 'group') {
     return groups.value.find((g) => g.id === form.groupId)?.contactCount ?? 0
   }
-  return recipients.value.length
+  if (recipientSource.value === 'contacts') {
+    return selectedContactPhones.value.length
+  }
+  return pastedRecipients.value.length
 })
+
 const pages = computed(() => smsPageCount(form.message))
 const cost = computed(() => estimateSmsCost(form.message, recipientCount.value, wallet.smsCost))
-const approvedSenders = computed(() => sms.senderIds.filter((s) => s.status === 'APPROVED'))
 
 const minScheduleLocal = computed(() => {
   const d = new Date(Date.now() + 60_000)
@@ -45,11 +59,21 @@ const minScheduleLocal = computed(() => {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 })
 
+watch(recipientSource, () => {
+  form.groupId = ''
+  form.pasteNumbers = ''
+  selectedContactIds.value = []
+  csvHint.value = ''
+})
+
 onMounted(async () => {
-  await Promise.all([sms.fetchSenderIds(), wallet.fetchBalance()])
-  groups.value = await contactService.listGroups()
-  const first = approvedSenders.value[0]
-  if (first) form.senderId = first.senderName
+  await wallet.fetchBalance()
+  const [groupList, contactPage] = await Promise.all([
+    contactService.listGroups(),
+    contactService.listContacts({ size: 500 }),
+  ])
+  groups.value = groupList
+  contacts.value = contactPage.content
 })
 
 function onCsvUpload(event: Event) {
@@ -73,11 +97,25 @@ async function onSubmit() {
   success.value = ''
   error.value = ''
   try {
+    if (recipientCount.value === 0) {
+      error.value =
+        recipientSource.value === 'group'
+          ? 'Select a contact group.'
+          : recipientSource.value === 'contacts'
+            ? 'Select at least one contact.'
+            : 'Paste or upload at least one phone number.'
+      return
+    }
+
     const payload = {
-      senderId: form.senderId || undefined,
       message: form.message,
-      recipients: form.groupId ? undefined : recipients.value,
-      groupId: form.groupId || undefined,
+      recipients:
+        recipientSource.value === 'group'
+          ? undefined
+          : recipientSource.value === 'contacts'
+            ? selectedContactPhones.value
+            : pastedRecipients.value,
+      groupId: recipientSource.value === 'group' ? form.groupId || undefined : undefined,
     }
 
     if (form.sendLater) {
@@ -97,7 +135,9 @@ async function onSubmit() {
       success.value = `Reminder scheduled for ${formatDate(when.toISOString())}: ${result.queuedCount} messages (batch ${result.batchId}).`
     } else {
       const result = await sms.sendBulk(payload)
-      success.value = `Campaign queued: ${result.queuedCount} messages (batch ${result.batchId}).`
+      const summary = summarizeBulkSmsResult(result)
+      if (summary.ok) success.value = summary.text
+      else error.value = summary.text
     }
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Campaign failed'
@@ -109,49 +149,67 @@ async function onSubmit() {
   <div>
     <PageHeader
       title="Bulk SMS"
-      description="Launch campaigns now, or schedule reminders for a later date."
+      description="Send to selected contacts, a group, or pasted / CSV numbers."
     />
 
     <div class="grid gap-6 lg:grid-cols-3">
       <AppCard class="lg:col-span-2" title="Campaign composer">
         <form class="space-y-4" @submit.prevent="onSubmit">
-          <FormField label="Sender ID" required>
-            <AppSelect v-model="form.senderId">
-              <option v-for="s in approvedSenders" :key="s.id" :value="s.senderName">
-                {{ s.senderName }}
-              </option>
-            </AppSelect>
-          </FormField>
+          <div>
+            <p class="mb-2 text-sm font-medium text-slate-700">Recipients</p>
+            <div class="mb-3 grid grid-cols-3 gap-2 rounded-lg bg-slate-100 p-1">
+              <button
+                v-for="option in [
+                  { id: 'contacts', label: 'Contacts' },
+                  { id: 'group', label: 'Group' },
+                  { id: 'manual', label: 'Paste / CSV' },
+                ] as const"
+                :key="option.id"
+                type="button"
+                class="rounded-md px-2 py-2 text-xs font-semibold transition sm:text-sm"
+                :class="
+                  recipientSource === option.id
+                    ? 'bg-white text-slate-900 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-700'
+                "
+                @click="recipientSource = option.id"
+              >
+                {{ option.label }}
+              </button>
+            </div>
 
-          <div class="grid gap-4 sm:grid-cols-2">
-            <FormField label="Contact group">
-              <AppSelect v-model="form.groupId" placeholder="Optional group">
-                <option value="">None — use pasted / CSV numbers</option>
+            <FormField v-if="recipientSource === 'contacts'" label="Select contacts" required>
+              <ContactPicker v-model="selectedContactIds" :contacts="contacts" multiple />
+            </FormField>
+
+            <FormField v-else-if="recipientSource === 'group'" label="Contact group" required>
+              <AppSelect v-model="form.groupId" placeholder="Select a group">
                 <option v-for="g in groups" :key="g.id" :value="g.id">
                   {{ g.name }} ({{ g.contactCount }})
                 </option>
               </AppSelect>
             </FormField>
-            <FormField label="Upload CSV" hint="One phone number per row or comma-separated">
-              <input
-                type="file"
-                accept=".csv,text/csv"
-                class="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-brand-50 file:px-3 file:py-2 file:text-sm file:font-medium file:text-brand-700"
-                @change="onCsvUpload"
-              />
-              <p v-if="csvHint" class="mt-1 text-xs text-brand-700">{{ csvHint }}</p>
-            </FormField>
-          </div>
 
-          <FormField label="Paste phone numbers" hint="One per line, or comma-separated">
-            <AppInput
-              v-model="form.pasteNumbers"
-              type="textarea"
-              :rows="5"
-              placeholder="0712345678&#10;0722334455"
-              :disabled="Boolean(form.groupId)"
-            />
-          </FormField>
+            <div v-else class="space-y-4">
+              <FormField label="Upload CSV" hint="One phone number per row or comma-separated">
+                <input
+                  type="file"
+                  accept=".csv,text/csv"
+                  class="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-brand-50 file:px-3 file:py-2 file:text-sm file:font-medium file:text-brand-700"
+                  @change="onCsvUpload"
+                />
+                <p v-if="csvHint" class="mt-1 text-xs text-brand-700">{{ csvHint }}</p>
+              </FormField>
+              <FormField label="Paste phone numbers" hint="One per line, or comma-separated">
+                <AppInput
+                  v-model="form.pasteNumbers"
+                  type="textarea"
+                  :rows="5"
+                  placeholder="0712345678&#10;0722334455"
+                />
+              </FormField>
+            </div>
+          </div>
 
           <FormField label="Message" required>
             <AppInput v-model="form.message" type="textarea" :rows="5" />

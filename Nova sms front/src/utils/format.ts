@@ -53,14 +53,6 @@ export function initials(name: string): string {
     .join('')
 }
 
-export function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms))
-}
-
-export function isMockMode(): boolean {
-  return import.meta.env.VITE_USE_MOCK === 'true'
-}
-
 export function looksLikeEmail(value: string): boolean {
   return value.includes('@')
 }
@@ -75,11 +67,17 @@ export function normalizePhone(phone: string): string {
   if (cleaned.startsWith('+')) cleaned = cleaned.slice(1)
   if (cleaned.startsWith('00')) cleaned = cleaned.slice(2)
   if (cleaned.startsWith('0') && cleaned.length === 10) {
+    // 07XXXXXXXX → 2547…, 011XXXXXXX → 25411…
     cleaned = `254${cleaned.slice(1)}`
-  } else if (/^[17]\d{8}$/.test(cleaned)) {
+  } else if (/^7\d{8}$/.test(cleaned) || /^11\d{7}$/.test(cleaned)) {
     cleaned = `254${cleaned}`
   }
   return cleaned
+}
+
+/** Safaricom: 2547XXXXXXXX (07…) or 25411XXXXXXX (011…). */
+export function isSafaricomMsisdn(phone: string): boolean {
+  return /^254(7\d{8}|11\d{7})$/.test(normalizePhone(phone))
 }
 
 export function normalizeLoginIdentifier(value: string): string {
@@ -87,4 +85,71 @@ export function normalizeLoginIdentifier(value: string): string {
   if (looksLikePhone(trimmed)) return normalizePhone(trimmed)
   return trimmed.toLowerCase()
 }
+
+/** Clean Africa's Talking / provider error text for UI display. */
+export function formatProviderError(reason: string | null | undefined): string {
+  if (!reason) return 'Provider rejected the message.'
+  return reason
+    .replace(/^\d{3}\s+[A-Za-z ]+:\s*/i, '')
+    .replace(/^"|"$/g, '')
+    .trim() || 'Provider rejected the message.'
+}
+
+export function summarizeSingleSmsResult(message: {
+  status: string
+  recipient: string
+  failureReason?: string | null
+}): { ok: boolean; text: string } {
+  if (message.status === 'FAILED') {
+    return {
+      ok: false,
+      text: `Send failed for ${message.recipient}: ${formatProviderError(message.failureReason)}`,
+    }
+  }
+  if (message.status === 'DELIVERED') {
+    return {
+      ok: true,
+      text: `Message delivered to ${message.recipient}.`,
+    }
+  }
+  return {
+    ok: true,
+    text: `Message accepted for ${message.recipient}. Delivery confirmation pending.`,
+  }
+}
+
+export function summarizeBulkSmsResult(result: {
+  queuedCount: number
+  batchId: string
+  messages: Array<{ status: string; recipient: string; failureReason?: string | null }>
+}): { ok: boolean; text: string } {
+  const failed = result.messages.filter((m) => m.status === 'FAILED')
+  const sent = result.messages.filter((m) => m.status !== 'FAILED')
+
+  if (failed.length === 0) {
+    return {
+      ok: true,
+      text: `Campaign sent: ${result.queuedCount} message${result.queuedCount === 1 ? '' : 's'} (batch ${result.batchId}).`,
+    }
+  }
+
+  const samples = failed
+    .slice(0, 3)
+    .map((m) => `${m.recipient}: ${formatProviderError(m.failureReason)}`)
+    .join(' · ')
+  const extra = failed.length > 3 ? ` (+${failed.length - 3} more)` : ''
+
+  if (sent.length === 0) {
+    return {
+      ok: false,
+      text: `All ${failed.length} message${failed.length === 1 ? '' : 's'} failed. ${samples}${extra}`,
+    }
+  }
+
+  return {
+    ok: false,
+    text: `${sent.length} sent, ${failed.length} failed. ${samples}${extra}`,
+  }
+}
+
 

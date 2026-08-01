@@ -85,6 +85,12 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/legal/AcceptableUseView.vue'),
         meta: { title: 'Acceptable Use Policy' },
       },
+      {
+        path: 'data-bundles',
+        name: 'data-bundles',
+        component: () => import('@/views/dashboard/DataBundlesView.vue'),
+        meta: { title: 'Data Bundles' },
+      },
     ],
   },
   {
@@ -119,6 +125,12 @@ const routes: RouteRecordRaw[] = [
         name: 'bulk-sms',
         component: () => import('@/views/dashboard/BulkSmsView.vue'),
         meta: { requiresAuth: true, title: 'Bulk SMS', roles: ['ORGANIZATION_ADMIN'] },
+      },
+      {
+        path: 'data-bundles/history',
+        name: 'data-bundle-history',
+        component: () => import('@/views/dashboard/BundleHistoryView.vue'),
+        meta: { requiresAuth: true, title: 'Bundle History', roles: ['ORGANIZATION_ADMIN'] },
       },
       {
         path: 'contacts',

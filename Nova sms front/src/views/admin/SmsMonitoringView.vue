@@ -15,12 +15,12 @@ import {
 
 const sms = useSmsStore()
 
-onMounted(() => sms.fetchHistory())
+onMounted(() => sms.fetchHistory(0, 50))
 
 const counts = () => {
   const all = sms.history
   return {
-    queued: all.filter((m) => m.status === 'QUEUED').length,
+    queued: all.filter((m) => m.status === 'PENDING' || m.status === 'SCHEDULED').length,
     delivered: all.filter((m) => m.status === 'DELIVERED').length,
     failed: all.filter((m) => m.status === 'FAILED').length,
     total: all.length,
@@ -59,6 +59,7 @@ const counts = () => {
 
     <DataTable
       :columns="[
+        { key: 'organization', label: 'Organization' },
         { key: 'recipient', label: 'Recipient' },
         { key: 'sender', label: 'Sender ID' },
         { key: 'message', label: 'Message' },
@@ -68,6 +69,9 @@ const counts = () => {
       ]"
     >
       <tr v-for="row in sms.history" :key="row.id" class="hover:bg-slate-50/70">
+        <td class="px-4 py-3 font-medium text-slate-800">
+          {{ row.organizationName || '—' }}
+        </td>
         <td class="px-4 py-3 font-mono text-xs">{{ row.recipient }}</td>
         <td class="px-4 py-3">{{ row.senderId }}</td>
         <td class="max-w-sm truncate px-4 py-3 text-slate-600">{{ row.content }}</td>

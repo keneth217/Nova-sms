@@ -34,7 +34,13 @@ public class SmsDeliveryReport {
     @Column(length = 20)
     private String networkCode;
 
-    @Column(length = 20)
+    @Column(name = "provider_status", length = 50)
+    private String providerStatus;
+
+    @Column(name = "phone_number", length = 30)
+    private String phoneNumber;
+
+    @Column(name = "failure_reason", length = 255)
     private String failureReason;
 
     @Enumerated(EnumType.STRING)

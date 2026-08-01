@@ -6,6 +6,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 
+import java.util.Optional;
 import java.util.UUID;
 
 public final class SecurityUtils {
@@ -19,6 +20,21 @@ public final class SecurityUtils {
             throw new ApiException("Unauthenticated", HttpStatus.UNAUTHORIZED);
         }
         return principal;
+    }
+
+    public static Optional<UserPrincipal> optionalUser() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.getPrincipal() instanceof UserPrincipal principal) {
+            return Optional.of(principal);
+        }
+        return Optional.empty();
+    }
+
+    /** Organization from JWT when present; empty for anonymous/public callers. */
+    public static Optional<UUID> optionalOrganizationId() {
+        return optionalUser()
+                .map(UserPrincipal::getOrganizationId)
+                .filter(id -> id != null);
     }
 
     public static UUID requireOrganizationId() {

@@ -36,7 +36,7 @@ public class PasswordResetService {
     private final PasswordEncoder passwordEncoder;
     private final PasswordResetMailService mailService;
 
-    @Value("${novastack.frontend.base-url:http://localhost:5173}")
+    @Value("${novastack.frontend.base-url:https://novasms.novastack.co.ke}")
     private String frontendBaseUrl;
 
     @Transactional

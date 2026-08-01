@@ -16,7 +16,7 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: 'http://localhost:8092',
+        target: 'https://smsapi.novastack.co.ke',
         changeOrigin: true,
       },
     },

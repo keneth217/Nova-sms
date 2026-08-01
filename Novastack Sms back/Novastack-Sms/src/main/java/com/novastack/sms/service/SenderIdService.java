@@ -63,30 +63,18 @@ public class SenderIdService {
         return senderIdRepository.save(entity);
     }
 
+    /**
+     * Sender is chosen by the platform — clients cannot pick one.
+     * Order: approved platform default (NOVASTACK) → approved org sender → config fallback.
+     */
     @Transactional(readOnly = true)
-    public String resolveApprovedSender(UUID organizationId, String requestedSender) {
-        if (requestedSender == null || requestedSender.isBlank()) {
-            return senderIdRepository.findFirstByPlatformDefaultTrueAndStatus(SenderIdStatus.APPROVED)
-                    .map(SenderId::getSenderName)
-                    .orElse(appProperties.getSms().getPlatformSenderId());
-        }
-
-        String normalized = requestedSender.trim();
-        boolean owned = senderIdRepository.existsByOrganizationIdAndSenderNameIgnoreCaseAndStatus(
-                organizationId, normalized, SenderIdStatus.APPROVED);
-        if (owned) {
-            return normalized.toUpperCase();
-        }
-
-        boolean isPlatform = senderIdRepository.findFirstByPlatformDefaultTrueAndStatus(SenderIdStatus.APPROVED)
-                .map(s -> s.getSenderName().equalsIgnoreCase(normalized))
-                .orElse(appProperties.getSms().getPlatformSenderId().equalsIgnoreCase(normalized));
-
-        if (isPlatform) {
-            return normalized.toUpperCase();
-        }
-
-        throw new ApiException("Sender ID not approved for this organization: " + requestedSender,
-                HttpStatus.FORBIDDEN);
+    public String resolveApprovedSender(UUID organizationId, String ignoredClientSenderId) {
+        return senderIdRepository.findFirstByPlatformDefaultTrueAndStatus(SenderIdStatus.APPROVED)
+                .map(SenderId::getSenderName)
+                .or(() -> senderIdRepository
+                        .findFirstByOrganizationIdAndStatusAndPlatformDefaultFalseOrderByCreatedAtAsc(
+                                organizationId, SenderIdStatus.APPROVED)
+                        .map(SenderId::getSenderName))
+                .orElseGet(() -> appProperties.getSms().getPlatformSenderId().toUpperCase());
     }
 }

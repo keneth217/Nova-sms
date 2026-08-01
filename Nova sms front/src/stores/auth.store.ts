@@ -13,7 +13,7 @@ import type {
 import type { Organization } from '@/models/organization.model'
 import type { User } from '@/models/user.model'
 import { authService } from '@/api/auth.service'
-import { authUserFromResponse } from '@/mocks/data'
+import { authUserFromResponse } from '@/utils/auth'
 import { useOrganizationStore } from '@/stores/organization.store'
 
 const TOKEN_KEY = 'nova_sms_token'

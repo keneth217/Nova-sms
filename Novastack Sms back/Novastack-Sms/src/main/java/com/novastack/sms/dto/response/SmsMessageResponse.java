@@ -13,6 +13,8 @@ import java.util.UUID;
 public class SmsMessageResponse {
 
     private UUID id;
+    private UUID organizationId;
+    private String organizationName;
     private String recipient;
     private String content;
     private String senderId;

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import {
   ArrowDownTrayIcon,
   DocumentArrowDownIcon,
@@ -16,6 +16,7 @@ import AppInput from '@/components/common/AppInput.vue'
 import AppSelect from '@/components/common/AppSelect.vue'
 import FormField from '@/components/common/FormField.vue'
 import AppModal from '@/components/common/AppModal.vue'
+import ContactPicker from '@/components/common/ContactPicker.vue'
 import DataTable from '@/components/tables/DataTable.vue'
 import { formatDate, parsePhoneList } from '@/utils/format'
 import { exportContactsToExcel } from '@/utils/exportExcel'
@@ -36,6 +37,14 @@ const importError = ref('')
 const showGroupModal = ref(false)
 const showContactModal = ref(false)
 const showImportModal = ref(false)
+const showAssignModal = ref(false)
+const savingGroup = ref(false)
+const savingContact = ref(false)
+const assigning = ref(false)
+const removingId = ref('')
+const groupError = ref('')
+const contactError = ref('')
+const assignError = ref('')
 
 const groupForm = reactive({ name: '', description: '' })
 const contactForm = reactive({
@@ -44,6 +53,10 @@ const contactForm = reactive({
   lastName: '',
   email: '',
   groupId: '',
+})
+const assignForm = reactive({
+  groupId: '',
+  contactIds: [] as string[],
 })
 const importText = ref('')
 const importGroupId = ref('')
@@ -67,6 +80,11 @@ const selectedGroupName = computed(
   () => groups.value.find((g) => g.id === selectedGroup.value)?.name,
 )
 
+const assignableContacts = computed(() => {
+  if (!assignForm.groupId) return contacts.value
+  return contacts.value.filter((c) => !c.groupIds.includes(assignForm.groupId))
+})
+
 const exportMeta = computed(() => ({
   organizationName: orgStore.organizationName || 'Organization',
   groupFilter: selectedGroupName.value,
@@ -76,10 +94,7 @@ async function load() {
   loading.value = true
   try {
     groups.value = await contactService.listGroups()
-    const page = await contactService.listContacts({
-      groupId: selectedGroup.value || undefined,
-      size: 50,
-    })
+    const page = await contactService.listContacts({ size: 200 })
     contacts.value = page.content
   } finally {
     loading.value = false
@@ -88,27 +103,141 @@ async function load() {
 
 onMounted(load)
 
+watch(
+  () => assignForm.groupId,
+  (groupId) => {
+    if (!groupId) {
+      assignForm.contactIds = []
+      return
+    }
+    assignForm.contactIds = assignForm.contactIds.filter((id) => {
+      const contact = contacts.value.find((c) => c.id === id)
+      return contact && !contact.groupIds.includes(groupId)
+    })
+  },
+)
+
 async function createGroup() {
-  await contactService.createGroup({ ...groupForm })
-  showGroupModal.value = false
-  groupForm.name = ''
-  groupForm.description = ''
-  message.value = 'Group created.'
-  await load()
+  groupError.value = ''
+  message.value = ''
+  const name = groupForm.name.trim()
+  if (!name) {
+    groupError.value = 'Group name is required.'
+    return
+  }
+  savingGroup.value = true
+  try {
+    await contactService.createGroup({
+      name,
+      description: groupForm.description.trim() || undefined,
+    })
+    showGroupModal.value = false
+    groupForm.name = ''
+    groupForm.description = ''
+    message.value = 'Group created.'
+    await load()
+  } catch (e) {
+    groupError.value = e instanceof Error ? e.message : 'Failed to create group'
+  } finally {
+    savingGroup.value = false
+  }
 }
 
 async function createContact() {
-  await contactService.createContact({
-    phone: contactForm.phone,
-    firstName: contactForm.firstName || undefined,
-    lastName: contactForm.lastName || undefined,
-    email: contactForm.email || undefined,
-    groupId: contactForm.groupId || undefined,
-  })
-  showContactModal.value = false
-  Object.assign(contactForm, { phone: '', firstName: '', lastName: '', email: '', groupId: '' })
-  message.value = 'Contact added.'
-  await load()
+  contactError.value = ''
+  message.value = ''
+  if (!contactForm.phone.trim()) {
+    contactError.value = 'Phone number is required.'
+    return
+  }
+  savingContact.value = true
+  try {
+    await contactService.createContact({
+      phone: contactForm.phone,
+      firstName: contactForm.firstName || undefined,
+      lastName: contactForm.lastName || undefined,
+      email: contactForm.email || undefined,
+      groupId: contactForm.groupId || undefined,
+    })
+    showContactModal.value = false
+    Object.assign(contactForm, { phone: '', firstName: '', lastName: '', email: '', groupId: '' })
+    message.value = 'Contact added.'
+    await load()
+  } catch (e) {
+    contactError.value = e instanceof Error ? e.message : 'Failed to add contact'
+  } finally {
+    savingContact.value = false
+  }
+}
+
+function openGroupModal() {
+  groupError.value = ''
+  showGroupModal.value = true
+}
+
+function openContactModal() {
+  contactError.value = ''
+  contactForm.groupId = selectedGroup.value || ''
+  showContactModal.value = true
+}
+
+function openAssignModal(preselectedContactIds: string[] = []) {
+  assignError.value = ''
+  assignForm.groupId = selectedGroup.value || groups.value[0]?.id || ''
+  assignForm.contactIds = [...preselectedContactIds]
+  showAssignModal.value = true
+}
+
+function openAssignForGroup(groupId: string) {
+  selectedGroup.value = groupId
+  openAssignModal()
+}
+
+async function assignContacts() {
+  assignError.value = ''
+  message.value = ''
+  if (!assignForm.groupId) {
+    assignError.value = 'Select a group.'
+    return
+  }
+  if (!assignForm.contactIds.length) {
+    assignError.value = 'Select at least one contact.'
+    return
+  }
+  assigning.value = true
+  try {
+    const result = await contactService.addToGroup(assignForm.groupId, {
+      contactIds: assignForm.contactIds,
+    })
+    const groupName =
+      groups.value.find((g) => g.id === assignForm.groupId)?.name || 'group'
+    showAssignModal.value = false
+    assignForm.contactIds = []
+    message.value =
+      result.added > 0
+        ? `Added ${result.added} contact${result.added === 1 ? '' : 's'} to ${groupName}.`
+        : `Selected contacts are already in ${groupName}.`
+    await load()
+  } catch (e) {
+    assignError.value = e instanceof Error ? e.message : 'Failed to assign contacts'
+  } finally {
+    assigning.value = false
+  }
+}
+
+async function removeFromSelectedGroup(contact: Contact) {
+  if (!selectedGroup.value) return
+  removingId.value = contact.id
+  message.value = ''
+  try {
+    await contactService.removeFromGroup(selectedGroup.value, contact.id)
+    message.value = `Removed from ${selectedGroupName.value || 'group'}.`
+    await load()
+  } catch (e) {
+    message.value = e instanceof Error ? e.message : 'Failed to remove from group'
+  } finally {
+    removingId.value = ''
+  }
 }
 
 function onExcelSelected(event: Event) {
@@ -234,8 +363,15 @@ function openImportModal() {
           PDF
         </AppButton>
         <AppButton variant="secondary" @click="openImportModal">Import</AppButton>
-        <AppButton variant="secondary" @click="showGroupModal = true">New group</AppButton>
-        <AppButton @click="showContactModal = true">Add contact</AppButton>
+        <AppButton variant="secondary" @click="openGroupModal">New group</AppButton>
+        <AppButton
+          variant="secondary"
+          :disabled="!groups.length || !contacts.length"
+          @click="openAssignModal()"
+        >
+          Assign to group
+        </AppButton>
+        <AppButton @click="openContactModal">Add contact</AppButton>
       </template>
     </PageHeader>
 
@@ -258,11 +394,17 @@ function openImportModal() {
         <p class="mt-1 text-xs text-slate-500">{{ group.description || 'No description' }}</p>
         <p class="mt-3 text-2xl font-semibold text-brand-700">{{ group.contactCount }}</p>
         <p class="text-xs text-slate-400">contacts</p>
+        <span
+          class="mt-3 inline-flex text-xs font-medium text-brand-700 hover:underline"
+          @click.stop="openAssignForGroup(group.id)"
+        >
+          Add members
+        </span>
       </button>
     </div>
 
     <AppCard title="Contact directory" :padding="false">
-      <div class="flex flex-wrap gap-3 border-b border-slate-100 px-5 py-4">
+      <div class="flex flex-wrap items-center gap-3 border-b border-slate-100 px-5 py-4">
         <div class="min-w-[220px] flex-1">
           <AppInput v-model="search" placeholder="Search contacts…" />
         </div>
@@ -270,6 +412,15 @@ function openImportModal() {
           <option value="">All groups</option>
           <option v-for="g in groups" :key="g.id" :value="g.id">{{ g.name }}</option>
         </AppSelect>
+        <AppButton
+          v-if="selectedGroup"
+          size="sm"
+          variant="secondary"
+          :disabled="!contacts.length"
+          @click="openAssignModal()"
+        >
+          Add members
+        </AppButton>
       </div>
 
       <DataTable
@@ -279,6 +430,7 @@ function openImportModal() {
           { key: 'email', label: 'Email' },
           { key: 'groups', label: 'Groups' },
           { key: 'created', label: 'Added' },
+          { key: 'actions', label: '' },
         ]"
         empty-title="No contacts yet"
       >
@@ -290,27 +442,53 @@ function openImportModal() {
           <td class="px-4 py-3 text-slate-600">{{ c.email || '—' }}</td>
           <td class="px-4 py-3 text-slate-600">{{ c.groupNames.join(', ') || '—' }}</td>
           <td class="px-4 py-3 text-slate-500">{{ formatDate(c.createdAt, false) }}</td>
+          <td class="px-4 py-3">
+            <div class="flex flex-wrap justify-end gap-2">
+              <AppButton size="sm" variant="ghost" @click="openAssignModal([c.id])">
+                Assign
+              </AppButton>
+              <AppButton
+                v-if="selectedGroup && c.groupIds.includes(selectedGroup)"
+                size="sm"
+                variant="ghost"
+                :loading="removingId === c.id"
+                @click="removeFromSelectedGroup(c)"
+              >
+                Remove
+              </AppButton>
+            </div>
+          </td>
         </tr>
       </DataTable>
     </AppCard>
 
     <AppModal :open="showGroupModal" title="Create contact group" @close="showGroupModal = false">
-      <form class="space-y-4" @submit.prevent="createGroup">
+      <form id="create-group-form" class="space-y-4" @submit.prevent="createGroup">
         <FormField label="Name" required>
-          <AppInput v-model="groupForm.name" />
+          <AppInput v-model="groupForm.name" placeholder="e.g. Customers" autofocus />
         </FormField>
         <FormField label="Description">
           <AppInput v-model="groupForm.description" type="textarea" :rows="3" />
         </FormField>
+        <p v-if="groupError" class="text-sm text-rose-600">{{ groupError }}</p>
       </form>
       <template #footer>
-        <AppButton variant="secondary" @click="showGroupModal = false">Cancel</AppButton>
-        <AppButton :disabled="!groupForm.name" @click="createGroup">Create</AppButton>
+        <AppButton variant="secondary" :disabled="savingGroup" @click="showGroupModal = false">
+          Cancel
+        </AppButton>
+        <AppButton
+          type="submit"
+          form="create-group-form"
+          :loading="savingGroup"
+          :disabled="!groupForm.name.trim()"
+        >
+          Create
+        </AppButton>
       </template>
     </AppModal>
 
     <AppModal :open="showContactModal" title="Add contact" @close="showContactModal = false">
-      <form class="space-y-4" @submit.prevent="createContact">
+      <form id="create-contact-form" class="space-y-4" @submit.prevent="createContact">
         <FormField label="Phone" required>
           <AppInput v-model="contactForm.phone" type="tel" placeholder="0712345678" />
         </FormField>
@@ -331,10 +509,66 @@ function openImportModal() {
             <option v-for="g in groups" :key="g.id" :value="g.id">{{ g.name }}</option>
           </AppSelect>
         </FormField>
+        <p v-if="contactError" class="text-sm text-rose-600">{{ contactError }}</p>
       </form>
       <template #footer>
-        <AppButton variant="secondary" @click="showContactModal = false">Cancel</AppButton>
-        <AppButton :disabled="!contactForm.phone" @click="createContact">Save</AppButton>
+        <AppButton variant="secondary" :disabled="savingContact" @click="showContactModal = false">
+          Cancel
+        </AppButton>
+        <AppButton
+          type="submit"
+          form="create-contact-form"
+          :loading="savingContact"
+          :disabled="!contactForm.phone.trim()"
+        >
+          Save
+        </AppButton>
+      </template>
+    </AppModal>
+
+    <AppModal
+      :open="showAssignModal"
+      title="Assign contacts to group"
+      subtitle="Pick a saved group, then select existing contacts to add."
+      size="lg"
+      @close="showAssignModal = false"
+    >
+      <form id="assign-group-form" class="space-y-4" @submit.prevent="assignContacts">
+        <FormField label="Group" required>
+          <AppSelect v-model="assignForm.groupId">
+            <option value="" disabled>Select a group</option>
+            <option v-for="g in groups" :key="g.id" :value="g.id">{{ g.name }}</option>
+          </AppSelect>
+        </FormField>
+        <FormField
+          label="Contacts"
+          :hint="
+            assignForm.groupId
+              ? 'Only contacts not already in this group are listed.'
+              : 'Select a group first.'
+          "
+        >
+          <ContactPicker
+            v-model="assignForm.contactIds"
+            :contacts="assignableContacts"
+            :disabled="!assignForm.groupId || assigning"
+            max-height-class="max-h-72"
+          />
+        </FormField>
+        <p v-if="assignError" class="text-sm text-rose-600">{{ assignError }}</p>
+      </form>
+      <template #footer>
+        <AppButton variant="secondary" :disabled="assigning" @click="showAssignModal = false">
+          Cancel
+        </AppButton>
+        <AppButton
+          type="submit"
+          form="assign-group-form"
+          :loading="assigning"
+          :disabled="!assignForm.groupId || !assignForm.contactIds.length"
+        >
+          Assign
+        </AppButton>
       </template>
     </AppModal>
 

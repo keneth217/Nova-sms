@@ -2,7 +2,7 @@
 import { computed, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth.store'
 import { useOrganizationStore } from '@/stores/organization.store'
-import { formatDate, isMockMode } from '@/utils/format'
+import { formatDate } from '@/utils/format'
 import PageHeader from '@/components/common/PageHeader.vue'
 import AppCard from '@/components/common/AppCard.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
@@ -10,7 +10,6 @@ import StatusBadge from '@/components/common/StatusBadge.vue'
 const auth = useAuthStore()
 const org = useOrganizationStore()
 
-const apiMode = computed(() => (isMockMode() ? 'Mock data' : 'Live API'))
 const apiBase = import.meta.env.VITE_API_BASE_URL
 
 const displayOrgName = computed(() => {
@@ -98,12 +97,6 @@ onMounted(async () => {
           >
             <dt class="text-slate-500">Expires</dt>
             <dd class="font-medium text-slate-900">{{ formatDate(auth.user.expiresAt) }}</dd>
-          </div>
-          <div class="flex justify-between gap-4 border-b border-slate-100 pb-3">
-            <dt class="text-slate-500">Data mode</dt>
-            <dd>
-              <StatusBadge variant="info">{{ apiMode }}</StatusBadge>
-            </dd>
           </div>
           <div class="flex justify-between gap-4">
             <dt class="text-slate-500">API base</dt>

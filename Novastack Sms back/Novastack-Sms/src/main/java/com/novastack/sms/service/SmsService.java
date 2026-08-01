@@ -52,7 +52,7 @@ public class SmsService {
                 .recipient(normalizePhone(request.getRecipient()))
                 .content(request.getMessage())
                 .senderId(sender)
-                .status(MessageStatus.QUEUED)
+                .status(MessageStatus.PENDING)
                 .cost(org.getSmsCost())
                 .build());
 
@@ -74,6 +74,7 @@ public class SmsService {
 
         UUID batchId = UUID.randomUUID();
         List<SmsMessageResponse> responses = new ArrayList<>();
+        List<UUID> messageIds = new ArrayList<>();
 
         for (String recipient : recipients) {
             walletService.debitForSms(organizationId, org.getSmsCost(),
@@ -84,13 +85,19 @@ public class SmsService {
                     .recipient(normalizePhone(recipient))
                     .content(request.getMessage())
                     .senderId(sender)
-                    .status(MessageStatus.QUEUED)
+                    .status(MessageStatus.PENDING)
                     .cost(org.getSmsCost())
                     .batchId(batchId)
                     .build());
+            messageIds.add(message.getId());
+        }
 
-            smsDeliveryService.processQueuedMessage(message.getId());
-            responses.add(toResponse(smsMessageRepository.findById(message.getId()).orElse(message)));
+        // One Africa's Talking request for the whole batch (comma-separated "to").
+        smsDeliveryService.processQueuedBatch(batchId);
+
+        for (UUID messageId : messageIds) {
+            responses.add(toResponse(smsMessageRepository.findById(messageId)
+                    .orElseThrow(() -> new ApiException("SMS message not found", HttpStatus.NOT_FOUND))));
         }
 
         return BulkSmsResponse.builder()
@@ -175,8 +182,11 @@ public class SmsService {
     }
 
     public SmsMessageResponse toResponse(SmsMessage message) {
+        var organization = message.getOrganization();
         return SmsMessageResponse.builder()
                 .id(message.getId())
+                .organizationId(organization != null ? organization.getId() : null)
+                .organizationName(organization != null ? organization.getName() : null)
                 .recipient(message.getRecipient())
                 .content(message.getContent())
                 .senderId(message.getSenderId())

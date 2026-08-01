@@ -4,6 +4,7 @@ import com.novastack.sms.domain.entity.SmsMessage;
 import com.novastack.sms.domain.enums.MessageStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -16,14 +17,25 @@ import java.util.UUID;
 
 public interface SmsMessageRepository extends JpaRepository<SmsMessage, UUID> {
 
+    @EntityGraph(attributePaths = "organization")
     Page<SmsMessage> findByOrganizationIdOrderByCreatedAtDesc(UUID organizationId, Pageable pageable);
 
+    @EntityGraph(attributePaths = "organization")
     Page<SmsMessage> findAllByOrderByCreatedAtDesc(Pageable pageable);
 
     Optional<SmsMessage> findByProviderMessageId(String providerMessageId);
 
     @Query("SELECT m FROM SmsMessage m JOIN FETCH m.organization WHERE m.id = :id")
     Optional<SmsMessage> findByIdWithOrganization(@Param("id") UUID id);
+
+    @Query("""
+            SELECT m FROM SmsMessage m JOIN FETCH m.organization
+            WHERE m.batchId = :batchId AND m.status = :status
+            ORDER BY m.createdAt ASC
+            """)
+    List<SmsMessage> findByBatchIdAndStatusWithOrganization(
+            @Param("batchId") UUID batchId,
+            @Param("status") MessageStatus status);
 
     @Query("""
             SELECT m FROM SmsMessage m JOIN FETCH m.organization

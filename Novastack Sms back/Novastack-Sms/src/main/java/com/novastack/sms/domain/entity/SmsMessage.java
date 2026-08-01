@@ -44,7 +44,7 @@ public class SmsMessage {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     @Builder.Default
-    private MessageStatus status = MessageStatus.QUEUED;
+    private MessageStatus status = MessageStatus.PENDING;
 
     @Column(nullable = false, precision = 10, scale = 4)
     private BigDecimal cost;

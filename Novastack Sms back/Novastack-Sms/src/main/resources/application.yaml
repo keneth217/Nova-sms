@@ -54,10 +54,10 @@ springdoc:
 
 novastack:
   frontend:
-    base-url: ${FRONTEND_BASE_URL:http://localhost:5173}
+    base-url: ${FRONTEND_BASE_URL:https://novasms.novastack.co.ke}
   mail:
-    enabled: ${MAIL_ENABLED:false}
-    from: ${MAIL_FROM:no-reply@novasms.local}
+    enabled: ${MAIL_ENABLED:true}
+    from: ${MAIL_FROM:novastackt@gmail.com}
   jwt:
     secret: NovastackSmsGatewayJwtSecretKeyThatIsLongEnoughForHS256ProductionUse2026
     expiration-ms: 86400000
@@ -66,19 +66,36 @@ novastack:
     platform-sender-id: NOVASTACK
     max-retries: 3
   africastalking:
-    username: ${AT_USERNAME:sandbox}
-    api-key: ${AT_API_KEY:your-africas-talking-api-key}
-    base-url: ${AT_BASE_URL:https://api.sandbox.africastalking.com}
+    # Live Africa's Talking — set AT_USERNAME to your production app username (not "sandbox")
+    username: ${AT_USERNAME:}
+    api-key: ${AT_API_KEY:atsk_91636e4e47e7a0e88891d071f2fe9844cd97c53e006296c4fa51d3db1aa3d01f9ed11703}
+    base-url: ${AT_BASE_URL:https://api.africastalking.com}
     messaging-path: /version1/messaging
   mpesa:
-    shortcode: ${MPESA_SHORTCODE:174379}
-    passkey: ${MPESA_PASSKEY:}
-    consumer-key: ${MPESA_CONSUMER_KEY:}
-    consumer-secret: ${MPESA_CONSUMER_SECRET:}
+    shortcode: ${MPESA_SHORTCODE:5687394}
+    passkey: ${MPESA_PASSKEY:e6e13aa22b3a45178691dc99f590270e5d906ba8f0bca0736c234dda9f5c2bd5}
+    consumer-key: ${MPESA_CONSUMER_KEY:6YuGUYzOux3iNcpfmcYobMN27exn1guLAEyGaqyMECG0EGZG}
+    consumer-secret: ${MPESA_CONSUMER_SECRET:ws5bHf4twdINdDyJPmYbxAAaLW0qmJKpcdYaeh5s7L1pQcDXgWlNYOuaYA3Je08u}
     callback-base-url: ${MPESA_CALLBACK_BASE_URL:https://smsapi.novastack.co.ke}
-    base-url: ${MPESA_BASE_URL:https://sandbox.safaricom.co.ke}
+    base-url: ${MPESA_BASE_URL:https://api.safaricom.co.ke}
     account-reference-prefix: NOVA
     transaction-desc: Novastack SMS top-up
+  data-bundles:
+    # Same Daraja Consumer Key/Secret as M-Pesa is supported (shared app).
+    consumer-key: ${DATA_BUNDLES_CONSUMER_KEY:${MPESA_CONSUMER_KEY:6YuGUYzOux3iNcpfmcYobMN27exn1guLAEyGaqyMECG0EGZG}}
+    consumer-secret: ${DATA_BUNDLES_CONSUMER_SECRET:${MPESA_CONSUMER_SECRET:ws5bHf4twdINdDyJPmYbxAAaLW0qmJKpcdYaeh5s7L1pQcDXgWlNYOuaYA3Je08u}}
+    base-url: ${DATA_BUNDLES_BASE_URL:https://api.safaricom.co.ke}
+    oauth-path: /oauth/v1/generate
+    offers-path: /v1/dynamic-offers/fetch
+    purchase-path: /v1/dynamic-offers/facebook-bundle/purchase
+    status-path: /v2/bundles/get/status
+    service-account-id: ${DATA_BUNDLES_SERVICE_ACCOUNT_ID:0}
+    # Required on purchase: x-source-system (facebook-bundle examples use "fb")
+    source-system: ${DATA_BUNDLES_SOURCE_SYSTEM:fb}
+    callback-base-url: ${DATA_BUNDLES_CALLBACK_BASE_URL:https://smsapi.novastack.co.ke}
+    callback-token: ${DATA_BUNDLES_CALLBACK_TOKEN:}
+    rate-limit-per-minute: ${DATA_BUNDLES_RATE_LIMIT:30}
+    public-organization-id: ${DATA_BUNDLES_PUBLIC_ORG_ID:a0000000-0000-4000-8000-0000000000db}
   scheduler:
     fixed-delay-ms: 30000
   super-admin:

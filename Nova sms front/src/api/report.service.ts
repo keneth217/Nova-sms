@@ -10,15 +10,6 @@ import type {
 } from '@/models/report.model'
 import type { SmsMessage } from '@/models/sms.model'
 import type { WalletTransaction } from '@/models/wallet.model'
-import { delay, isMockMode } from '@/utils/format'
-import {
-  mockActivity,
-  mockCampaigns,
-  mockDailyVolume,
-  mockDashboard,
-  mockMonthlyUsage,
-  mockUsageSummary,
-} from '@/mocks/data'
 import { smsService } from '@/api/sms.service'
 import { walletService } from '@/api/wallet.service'
 import { senderIdService } from '@/api/senderid.service'
@@ -179,10 +170,6 @@ function buildActivity(
 
 class ReportService {
   async getDashboard(): Promise<DashboardReport> {
-    if (isMockMode()) {
-      await delay(300)
-      return { ...mockDashboard }
-    }
     const { data } = await api.get<ApiResponse<DashboardReport>>('/reports/dashboard')
     if (!data.success || !data.data) throw new Error(data.message || 'Failed to load dashboard')
 
@@ -198,37 +185,21 @@ class ReportService {
   }
 
   async getDailyVolume(): Promise<DailyVolumePoint[]> {
-    if (isMockMode()) {
-      await delay(200)
-      return [...mockDailyVolume]
-    }
     const history = await smsService.getHistory({ page: 0, size: 200 })
     return buildDailyVolume(history.content, 14)
   }
 
   async getMonthlyUsage(): Promise<MonthlyUsagePoint[]> {
-    if (isMockMode()) {
-      await delay(200)
-      return [...mockMonthlyUsage]
-    }
     const history = await smsService.getHistory({ page: 0, size: 200 })
     return buildMonthlyUsage(history.content)
   }
 
   async getCampaigns(): Promise<CampaignSummary[]> {
-    if (isMockMode()) {
-      await delay(200)
-      return [...mockCampaigns]
-    }
     const history = await smsService.getHistory({ page: 0, size: 200 })
     return buildCampaigns(history.content)
   }
 
   async getActivity(): Promise<ActivityItem[]> {
-    if (isMockMode()) {
-      await delay(200)
-      return [...mockActivity]
-    }
     const [history, transactions] = await Promise.all([
       smsService.getHistory({ page: 0, size: 20 }),
       walletService.getTransactions({ page: 0, size: 20 }),
@@ -237,10 +208,6 @@ class ReportService {
   }
 
   async getUsageSummary(): Promise<UsageSummaryRow[]> {
-    if (isMockMode()) {
-      await delay(200)
-      return [...mockUsageSummary]
-    }
     const [dashboard, daily] = await Promise.all([this.getDashboard(), this.getDailyVolume()])
     return this.buildUsageSummary(dashboard, daily)
   }

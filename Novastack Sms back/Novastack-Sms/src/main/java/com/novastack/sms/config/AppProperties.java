@@ -15,6 +15,7 @@ public class AppProperties {
     private Sms sms = new Sms();
     private AfricasTalking africastalking = new AfricasTalking();
     private Mpesa mpesa = new Mpesa();
+    private DataBundles dataBundles = new DataBundles();
     private SuperAdmin superAdmin = new SuperAdmin();
     private OrganizationDefaults organization = new OrganizationDefaults();
 
@@ -36,9 +37,9 @@ public class AppProperties {
     @Getter
     @Setter
     public static class AfricasTalking {
-        private String username = "sandbox";
+        private String username = "";
         private String apiKey = "";
-        private String baseUrl = "https://api.sandbox.africastalking.com";
+        private String baseUrl = "https://api.africastalking.com";
         private String messagingPath = "/version1/messaging";
     }
 
@@ -52,9 +53,41 @@ public class AppProperties {
         private String consumerSecret = "";
         /** Public HTTPS callback base, e.g. https://smsapi.novastack.co.ke */
         private String callbackBaseUrl = "https://smsapi.novastack.co.ke";
-        private String baseUrl = "https://sandbox.safaricom.co.ke";
+        private String baseUrl = "https://api.safaricom.co.ke";
         private String accountReferencePrefix = "NOVA";
         private String transactionDesc = "Novastack SMS wallet top-up";
+    }
+
+    @Getter
+    @Setter
+    public static class DataBundles {
+        private String consumerKey = "";
+        private String consumerSecret = "";
+        private String baseUrl = "https://api.safaricom.co.ke";
+        private String oauthPath = "/oauth/v1/generate";
+        /** GET /v1/dynamic-offers/fetch?msisdn= */
+        private String offersPath = "/v1/dynamic-offers/fetch";
+        /** POST /v1/dynamic-offers/facebook-bundle/purchase */
+        private String purchasePath = "/v1/dynamic-offers/facebook-bundle/purchase";
+        /** GET /v2/bundles/get/status?id=&serviceAccountId= */
+        private String statusPath = "/v2/bundles/get/status";
+        /** Use 0 for dynamic offers status queries. */
+        private String serviceAccountId = "0";
+        /**
+         * Required purchase header {@code x-source-system}.
+         * Facebook-bundle path examples use {@code fb}.
+         */
+        private String sourceSystem = "fb";
+        /** Public HTTPS base used to build Safaricom callbacks. */
+        private String callbackBaseUrl = "https://smsapi.novastack.co.ke";
+        /** Optional shared secret expected in X-Callback-Token header. */
+        private String callbackToken = "";
+        private int rateLimitPerMinute = 30;
+        /**
+         * Organization used for unauthenticated public data-bundle purchases.
+         * Seeded by Flyway as the Public Data Bundles system org.
+         */
+        private String publicOrganizationId = "a0000000-0000-4000-8000-0000000000db";
     }
 
     @Getter

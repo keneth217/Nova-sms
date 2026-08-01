@@ -22,6 +22,19 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final CustomUserDetailsService userDetailsService;
 
     @Override
+    protected boolean shouldNotFilter(@NonNull HttpServletRequest request) {
+        String path = request.getRequestURI();
+        if (path == null || !path.startsWith("/api/v1/data-bundles")) {
+            return false;
+        }
+        // Public endpoints only — history/metrics still need JWT.
+        return path.equals("/api/v1/data-bundles/callback")
+                || path.equals("/api/v1/data-bundles/offers")
+                || path.equals("/api/v1/data-bundles/purchase")
+                || path.startsWith("/api/v1/data-bundles/status/");
+    }
+
+    @Override
     protected void doFilterInternal(
             @NonNull HttpServletRequest request,
             @NonNull HttpServletResponse response,

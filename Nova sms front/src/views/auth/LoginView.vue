@@ -5,7 +5,6 @@ import { useAuthStore } from '@/stores/auth.store'
 import FormField from '@/components/common/FormField.vue'
 import AppInput from '@/components/common/AppInput.vue'
 import AppButton from '@/components/common/AppButton.vue'
-import { isMockMode } from '@/utils/format'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -35,19 +34,6 @@ async function onSubmit() {
     }
   } catch (e) {
     localError.value = e instanceof Error ? e.message : 'Login failed'
-  }
-}
-
-function fillDemo(role: 'org' | 'org-phone' | 'admin') {
-  if (role === 'admin') {
-    form.email = 'admin@novastack.com'
-    form.password = 'ChangeMe123!'
-  } else if (role === 'org-phone') {
-    form.email = '0712345678'
-    form.password = 'password123'
-  } else {
-    form.email = 'admin@acme.co.ke'
-    form.password = 'password123'
   }
 }
 </script>
@@ -122,22 +108,6 @@ function fillDemo(role: 'org' | 'org-phone' | 'admin') {
 
           <AppButton type="submit" block :loading="auth.loading">Sign in</AppButton>
         </form>
-
-        <div
-          v-if="isMockMode()"
-          class="mt-5 rounded-lg border border-dashed border-slate-200 bg-slate-50 p-3"
-        >
-          <p class="text-xs font-medium text-slate-600">Demo accounts</p>
-          <div class="mt-2 flex flex-wrap gap-2">
-            <AppButton size="sm" variant="secondary" @click="fillDemo('org')">Email login</AppButton>
-            <AppButton size="sm" variant="secondary" @click="fillDemo('org-phone')">
-              Phone login
-            </AppButton>
-            <AppButton size="sm" variant="secondary" @click="fillDemo('admin')">
-              Super admin
-            </AppButton>
-          </div>
-        </div>
 
         <p class="mt-6 text-center text-sm text-slate-500">
           New organization?

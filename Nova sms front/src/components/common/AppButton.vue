@@ -2,6 +2,7 @@
 withDefaults(
   defineProps<{
     type?: 'button' | 'submit' | 'reset'
+    form?: string
     variant?: 'primary' | 'secondary' | 'ghost' | 'danger'
     size?: 'sm' | 'md' | 'lg'
     loading?: boolean
@@ -38,6 +39,7 @@ const sizes: Record<string, string> = {
 <template>
   <button
     :type="type"
+    :form="form"
     class="inline-flex items-center justify-center gap-2 rounded-lg font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
     :class="[variants[variant], sizes[size], block ? 'w-full' : '']"
     :disabled="disabled || loading"

@@ -16,6 +16,7 @@ import {
   SignalIcon,
   PresentationChartLineIcon,
   UserCircleIcon,
+  DevicePhoneMobileIcon,
   XMarkIcon,
 } from '@heroicons/vue/24/outline'
 import { useAuthStore } from '@/stores/auth.store'
@@ -29,6 +30,7 @@ const auth = useAuthStore()
 const orgLinks = [
   { to: '/dashboard', label: 'Dashboard', icon: HomeIcon },
   { to: '/wallet', label: 'Wallet', icon: WalletIcon },
+  { to: '/data-bundles/history', label: 'Bundle History', icon: DevicePhoneMobileIcon },
   { to: '/send-sms', label: 'Send SMS', icon: PaperAirplaneIcon },
   { to: '/bulk-sms', label: 'Bulk SMS', icon: QueueListIcon },
   { to: '/contacts', label: 'Contacts', icon: UserGroupIcon },

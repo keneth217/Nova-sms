@@ -20,6 +20,7 @@ type Variant = 'neutral' | 'success' | 'warning' | 'danger' | 'info' | 'brand'
 function variantFor(status: string): Variant {
   switch (status) {
     case 'DELIVERED':
+    case 'SUCCESS':
     case 'APPROVED':
     case 'ACTIVE':
     case 'COMPLETED':
@@ -27,16 +28,15 @@ function variantFor(status: string): Variant {
     case 'BUSINESS':
       return 'success'
     case 'PENDING':
-    case 'QUEUED':
     case 'SCHEDULED':
     case 'EVENT':
       return 'warning'
     case 'FAILED':
+    case 'CANCELLED':
     case 'REJECTED':
     case 'SUSPENDED':
     case 'EXPIRED':
       return 'danger'
-    case 'SENT':
     case 'SMS_DEBIT':
       return 'info'
     case 'REFUND':

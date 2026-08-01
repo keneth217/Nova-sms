@@ -41,13 +41,15 @@ public class ReportService {
                 organizationId, MessageStatus.DELIVERED, startOfMonth, now);
         long failed = smsMessageRepository.countByOrgStatusAndPeriod(
                 organizationId, MessageStatus.FAILED, startOfMonth, now);
-        long sent = smsMessageRepository.countByOrgStatusAndPeriod(
-                organizationId, MessageStatus.SENT, startOfMonth, now);
+        long pending = smsMessageRepository.countByOrgStatusAndPeriod(
+                organizationId, MessageStatus.PENDING, startOfMonth, now);
 
-        long deliverableBase = delivered + failed + sent;
-        double deliveryRate = deliverableBase == 0 ? 0.0
-                : BigDecimal.valueOf(delivered * 100.0 / deliverableBase)
+        long finalized = delivered + failed;
+        double deliveryRate = finalized == 0 ? 0.0
+                : BigDecimal.valueOf(delivered * 100.0 / finalized)
                 .setScale(2, RoundingMode.HALF_UP).doubleValue();
+        // Keep "sent" KPI as accepted/in-flight + delivered (excludes pure failures)
+        long sent = delivered + pending;
 
         BigDecimal balance = walletRepository.findByOrganizationId(organizationId)
                 .map(wallet -> wallet.getBalance())

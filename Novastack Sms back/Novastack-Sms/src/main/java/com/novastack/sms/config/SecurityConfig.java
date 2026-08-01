@@ -1,11 +1,14 @@
 package com.novastack.sms.config;
 
 import com.novastack.sms.security.ApiKeyAuthenticationFilter;
+import com.novastack.sms.security.JsonAccessDeniedHandler;
+import com.novastack.sms.security.JsonAuthenticationEntryPoint;
 import com.novastack.sms.security.JwtAuthenticationFilter;
 import com.novastack.sms.security.OrganizationExpiryFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationProvider;
@@ -36,14 +39,40 @@ public class SecurityConfig {
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final ApiKeyAuthenticationFilter apiKeyAuthenticationFilter;
     private final OrganizationExpiryFilter organizationExpiryFilter;
+    private final JsonAuthenticationEntryPoint authenticationEntryPoint;
+    private final JsonAccessDeniedHandler accessDeniedHandler;
     private final UserDetailsService userDetailsService;
 
+    /**
+     * Public Safaricom data-bundle endpoints — no JWT, no "Session expired" for anonymous callers.
+     */
     @Bean
+    @Order(1)
+    public SecurityFilterChain publicDataBundlesSecurityFilterChain(HttpSecurity http) throws Exception {
+        http
+                .securityMatcher(
+                        "/api/v1/data-bundles/offers",
+                        "/api/v1/data-bundles/purchase",
+                        "/api/v1/data-bundles/status/**",
+                        "/api/v1/data-bundles/callback"
+                )
+                .csrf(AbstractHttpConfigurer::disable)
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
+        return http.build();
+    }
+
+    @Bean
+    @Order(2)
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint(authenticationEntryPoint)
+                        .accessDeniedHandler(accessDeniedHandler))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
                                 "/api/v1/auth/login",

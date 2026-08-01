@@ -14,6 +14,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -35,7 +37,7 @@ public class SmsDeliveryService {
             return;
         }
 
-        if (message.getStatus() != MessageStatus.QUEUED) {
+        if (message.getStatus() != MessageStatus.PENDING) {
             log.debug("Skipping message {} with status {}", messageId, message.getStatus());
             return;
         }
@@ -52,22 +54,10 @@ public class SmsDeliveryService {
             );
 
             SmsProvider.SmsProviderResult result = provider.send(request);
-
-            providerRequestLogRepository.save(ProviderRequestLog.builder()
-                    .smsMessageId(message.getId())
-                    .provider(provider.getName())
-                    .requestPayload(result.rawRequest())
-                    .responsePayload(result.rawResponse())
-                    .httpStatus(result.httpStatus())
-                    .success(result.success())
-                    .build());
+            saveProviderLog(message.getId(), provider.getName(), result);
 
             if (result.success()) {
-                message.setStatus(MessageStatus.SENT);
-                message.setProviderMessageId(result.providerMessageId());
-                message.setSentAt(Instant.now());
-                message.setFailureReason(null);
-                smsMessageRepository.save(message);
+                markSent(message, result.providerMessageId());
                 return;
             }
 
@@ -78,17 +68,101 @@ public class SmsDeliveryService {
                 continue;
             }
 
-            message.setStatus(MessageStatus.FAILED);
-            message.setFailureReason(result.errorMessage());
-            smsMessageRepository.save(message);
-
-            walletService.refund(
-                    message.getOrganization().getId(),
-                    message.getCost(),
-                    "REFUND-" + message.getId(),
-                    "Refund for failed SMS " + message.getId()
-            );
+            markFailedAndRefund(message, result.errorMessage());
             return;
         }
+    }
+
+    /**
+     * Sends all PENDING messages in a batch with one Africa's Talking bulk request
+     * ({@code to} = comma-separated recipients, {@code bulkSMSMode=1}, {@code enqueue=1}).
+     */
+    @Transactional
+    public void processQueuedBatch(UUID batchId) {
+        List<SmsMessage> messages = smsMessageRepository
+                .findByBatchIdAndStatusWithOrganization(batchId, MessageStatus.PENDING);
+        if (messages.isEmpty()) {
+            return;
+        }
+
+        SmsMessage first = messages.getFirst();
+        SmsProvider provider = smsProviderFactory.getDefaultProvider();
+        List<String> recipients = messages.stream().map(SmsMessage::getRecipient).toList();
+
+        Map<String, SmsProvider.SmsProviderResult> results = provider.sendBulk(
+                smsProviderFactory.buildBulkRequest(
+                        first.getOrganization(),
+                        recipients,
+                        first.getContent(),
+                        first.getSenderId()
+                )
+        );
+
+        SmsProvider.SmsProviderResult sample = results.values().stream().findFirst().orElse(null);
+        if (sample != null) {
+            saveProviderLog(first.getId(), provider.getName(), sample);
+        }
+
+        for (SmsMessage message : messages) {
+            SmsProvider.SmsProviderResult result = results.get(normalizePhoneKey(message.getRecipient()));
+            if (result == null) {
+                markFailedAndRefund(message, "No Africa's Talking result for recipient");
+                continue;
+            }
+            if (result.success()) {
+                markSent(message, result.providerMessageId());
+            } else {
+                markFailedAndRefund(message, result.errorMessage());
+            }
+        }
+    }
+
+    /** Provider accepted the message — stay PENDING until DLR sets DELIVERED/FAILED. */
+    private void markSent(SmsMessage message, String providerMessageId) {
+        if (message.getStatus() == MessageStatus.DELIVERED || message.getStatus() == MessageStatus.FAILED) {
+            return;
+        }
+        message.setStatus(MessageStatus.PENDING);
+        message.setProviderMessageId(providerMessageId);
+        message.setSentAt(Instant.now());
+        message.setFailureReason(null);
+        smsMessageRepository.save(message);
+    }
+
+    private void markFailedAndRefund(SmsMessage message, String errorMessage) {
+        message.setStatus(MessageStatus.FAILED);
+        message.setFailureReason(errorMessage);
+        smsMessageRepository.save(message);
+        walletService.refund(
+                message.getOrganization().getId(),
+                message.getCost(),
+                "REFUND-" + message.getId(),
+                "Refund for failed SMS " + message.getId()
+        );
+    }
+
+    private void saveProviderLog(UUID messageId, String providerName, SmsProvider.SmsProviderResult result) {
+        providerRequestLogRepository.save(ProviderRequestLog.builder()
+                .smsMessageId(messageId)
+                .provider(providerName)
+                .requestPayload(result.rawRequest())
+                .responsePayload(result.rawResponse())
+                .httpStatus(result.httpStatus())
+                .success(result.success())
+                .build());
+    }
+
+    private String normalizePhoneKey(String phone) {
+        if (phone == null) {
+            return "";
+        }
+        String cleaned = phone.trim().replaceAll("[\\s-]", "");
+        if (cleaned.startsWith("+")) {
+            cleaned = cleaned.substring(1);
+        }
+        if (cleaned.startsWith("00")) {
+            cleaned = cleaned.substring(2);
+        }
+        return cleaned;
     }
 }

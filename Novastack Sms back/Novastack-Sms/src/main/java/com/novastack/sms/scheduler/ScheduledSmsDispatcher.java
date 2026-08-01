@@ -28,7 +28,7 @@ public class ScheduledSmsDispatcher {
                 .findDueScheduledMessages(MessageStatus.SCHEDULED, Instant.now());
 
         for (SmsMessage message : due) {
-            message.setStatus(MessageStatus.QUEUED);
+            message.setStatus(MessageStatus.PENDING);
             smsMessageRepository.save(message);
             smsDeliveryService.processQueuedMessage(message.getId());
             log.info("Dispatched scheduled SMS {}", message.getId());
