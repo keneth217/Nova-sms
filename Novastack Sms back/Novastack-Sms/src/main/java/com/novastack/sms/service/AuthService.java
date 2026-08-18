@@ -52,7 +52,8 @@ public class AuthService {
 
     @Transactional
     public OrganizationResponse register(OrganizationRegisterRequest request) {
-        if (organizationRepository.existsByEmail(request.getEmail()) || userRepository.existsByEmail(request.getEmail())) {
+        if (organizationRepository.existsByEmailIgnoreCase(request.getEmail())
+                || userRepository.existsByEmailIgnoreCase(request.getEmail())) {
             throw new ApiException("Email already registered", HttpStatus.CONFLICT);
         }
 

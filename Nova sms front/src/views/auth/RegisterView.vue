@@ -80,7 +80,7 @@ async function onSubmit() {
       accountType: isEvent.value ? 'EVENT' : 'BUSINESS',
       termsAccepted: true,
     })
-    apiKey.value = org.apiKey
+    apiKey.value = org.apiKey || ''
     success.value = true
     localStorage.setItem(
       'nova_sms_account_intent',

@@ -1,6 +1,7 @@
 package com.novastack.sms.config;
 
 import com.novastack.sms.service.AuthService;
+import com.novastack.sms.service.BillingSettingsService;
 import com.novastack.sms.service.WalletService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -15,6 +16,7 @@ public class DataInitializer implements ApplicationRunner {
 
     private final AuthService authService;
     private final WalletService walletService;
+    private final BillingSettingsService billingSettingsService;
 
     @Override
     public void run(ApplicationArguments args) {
@@ -22,8 +24,9 @@ public class DataInitializer implements ApplicationRunner {
         authService.backfillMpesaAccountRefs();
         int walletsCreated = walletService.backfillMissingWallets();
         authService.ensureSuperAdmin();
+        billingSettingsService.current();
         log.info(
-                "Platform sender ID, M-Pesa account refs, wallets (created {}), and SUPER_ADMIN ensured",
+                "Platform sender ID, M-Pesa account refs, wallets (created {}), SUPER_ADMIN, and billing settings ensured",
                 walletsCreated);
     }
 }

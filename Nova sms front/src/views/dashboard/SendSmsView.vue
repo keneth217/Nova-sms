@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { useSmsStore } from '@/stores/sms.store'
 import { useWalletStore } from '@/stores/wallet.store'
 import { contactService } from '@/api/contact.service'
 import type { Contact, ContactGroup } from '@/models/contact.model'
+import type { MessageChannel } from '@/models/sms.model'
 import PageHeader from '@/components/common/PageHeader.vue'
 import AppCard from '@/components/common/AppCard.vue'
 import AppButton from '@/components/common/AppButton.vue'
@@ -11,12 +13,26 @@ import AppInput from '@/components/common/AppInput.vue'
 import AppSelect from '@/components/common/AppSelect.vue'
 import FormField from '@/components/common/FormField.vue'
 import ContactPicker from '@/components/common/ContactPicker.vue'
-import { estimateSmsCost, formatCurrency, formatDate, smsPageCount, summarizeBulkSmsResult, summarizeSingleSmsResult } from '@/utils/format'
+import {
+  estimateSmsCost,
+  estimateWhatsAppCost,
+  formatCurrency,
+  formatDate,
+  analyzeSms,
+  summarizeBulkSmsResult,
+  summarizeSingleSmsResult,
+} from '@/utils/format'
 
 type RecipientSource = 'phone' | 'contact' | 'group'
 
+const route = useRoute()
 const sms = useSmsStore()
 const wallet = useWalletStore()
+const channel = computed<MessageChannel>(() =>
+  route.meta.channel === 'WHATSAPP' ? 'WHATSAPP' : 'SMS',
+)
+const isWhatsApp = computed(() => channel.value === 'WHATSAPP')
+const channelLabel = computed(() => (isWhatsApp.value ? 'WhatsApp' : 'SMS'))
 const success = ref('')
 const error = ref('')
 const contacts = ref<Contact[]>([])
@@ -55,8 +71,14 @@ const recipientCount = computed(() => {
   return resolvedRecipients.value.length
 })
 
-const pages = computed(() => smsPageCount(form.message))
-const cost = computed(() => estimateSmsCost(form.message, recipientCount.value, wallet.smsCost))
+const pages = computed(() => (isWhatsApp.value ? (form.message ? 1 : 0) : analyzeSms(form.message).units))
+const encoding = computed(() => analyzeSms(form.message).encoding)
+const cost = computed(() =>
+  isWhatsApp.value
+    ? estimateWhatsAppCost(form.message, recipientCount.value, wallet.smsCost)
+    : estimateSmsCost(form.message, recipientCount.value, wallet.smsCost),
+)
+const remainingAfter = computed(() => wallet.formattedBalance - cost.value)
 
 const minScheduleLocal = computed(() => {
   const d = new Date(Date.now() + 60_000)
@@ -113,27 +135,36 @@ async function onSubmit() {
         error.value = 'Reminder time must be in the future.'
         return
       }
-      const result = await sms.scheduleSms({
-        recipients: recipientSource.value === 'group' ? undefined : resolvedRecipients.value,
-        groupId: recipientSource.value === 'group' ? form.groupId : undefined,
-        message: form.message,
-        scheduledAt: when.toISOString(),
-      })
+      const result = await sms.scheduleSms(
+        {
+          recipients: recipientSource.value === 'group' ? undefined : resolvedRecipients.value,
+          groupId: recipientSource.value === 'group' ? form.groupId : undefined,
+          message: form.message,
+          scheduledAt: when.toISOString(),
+        },
+        channel.value,
+      )
       success.value = `Reminder scheduled for ${formatDate(when.toISOString())} (${result.queuedCount} message${result.queuedCount === 1 ? '' : 's'}).`
     } else if (recipientSource.value === 'group' || resolvedRecipients.value.length > 1) {
-      const result = await sms.sendBulk({
-        recipients: recipientSource.value === 'group' ? undefined : resolvedRecipients.value,
-        groupId: recipientSource.value === 'group' ? form.groupId : undefined,
-        message: form.message,
-      })
+      const result = await sms.sendBulk(
+        {
+          recipients: recipientSource.value === 'group' ? undefined : resolvedRecipients.value,
+          groupId: recipientSource.value === 'group' ? form.groupId : undefined,
+          message: form.message,
+        },
+        channel.value,
+      )
       const summary = summarizeBulkSmsResult(result)
       if (summary.ok) success.value = summary.text
       else error.value = summary.text
     } else {
-      const result = await sms.sendSms({
-        recipient: resolvedRecipients.value[0]!,
-        message: form.message,
-      })
+      const result = await sms.sendSms(
+        {
+          recipient: resolvedRecipients.value[0]!,
+          message: form.message,
+        },
+        channel.value,
+      )
       const summary = summarizeSingleSmsResult(result)
       if (summary.ok) success.value = summary.text
       else error.value = summary.text
@@ -146,6 +177,7 @@ async function onSubmit() {
       form.scheduledAt = ''
       form.sendLater = false
       selectedContactIds.value = []
+      await wallet.fetchBalance()
     }
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Failed to send'
@@ -156,8 +188,12 @@ async function onSubmit() {
 <template>
   <div>
     <PageHeader
-      title="Send SMS"
-      description="Send to a phone number, a saved contact, or a whole contact group."
+      :title="`Send ${channelLabel}`"
+      :description="
+        isWhatsApp
+          ? 'Send a WhatsApp message to a phone number, a saved contact, or a whole contact group.'
+          : 'Send to a phone number, a saved contact, or a whole contact group.'
+      "
     />
 
     <div class="mx-auto grid max-w-4xl gap-6 lg:grid-cols-3">
@@ -227,7 +263,7 @@ async function onSubmit() {
               <span>
                 <span class="block text-sm font-semibold text-slate-900">Schedule reminder</span>
                 <span class="mt-0.5 block text-xs text-slate-500">
-                  Send this SMS automatically on a later date and time.
+                  Send this {{ channelLabel }} automatically on a later date and time.
                 </span>
               </span>
             </label>
@@ -251,29 +287,42 @@ async function onSubmit() {
           >
             <span class="text-slate-600">
               {{ recipientCount }} recipient{{ recipientCount === 1 ? '' : 's' }} ·
-              {{ form.message.length }} characters · {{ pages }} page{{ pages === 1 ? '' : 's' }}
+              {{ form.message.length }} characters
+              <template v-if="!isWhatsApp">
+                · {{ pages }} SMS unit{{ pages === 1 ? '' : 's' }}
+                <span class="text-slate-400">({{ encoding }})</span>
+              </template>
+              <template v-else> · 1 WhatsApp unit each</template>
             </span>
             <span class="font-semibold text-slate-900"> Est. cost {{ formatCurrency(cost) }} </span>
           </div>
+          <p class="text-xs text-slate-500">
+            Balance {{ formatCurrency(wallet.formattedBalance) }}
+            <span v-if="recipientCount > 0 && form.message">
+              · After sending {{ formatCurrency(remainingAfter) }}
+            </span>
+          </p>
 
           <p v-if="success" class="text-sm text-emerald-700">{{ success }}</p>
           <p v-if="error" class="text-sm text-rose-600">{{ error }}</p>
 
           <AppButton type="submit" :loading="sms.loading" :disabled="!canSubmit">
-            {{ form.sendLater ? 'Schedule reminder' : 'Send SMS' }}
+            {{ form.sendLater ? 'Schedule reminder' : `Send ${channelLabel}` }}
           </AppButton>
         </form>
       </AppCard>
 
       <AppCard title="Tips">
         <ul class="space-y-3 text-sm text-slate-600">
-          <li>Sender ID is applied automatically (platform NOVASTACK, or your approved org sender).</li>
+          <li>If you omit a sender ID, Nova uses the TalkSasa default (currently TALK-SASA). Approved organization sender IDs are used when you select one.</li>
           <li>Pick a saved contact or send to an entire group in one go.</li>
-          <li>Keep OTPs under 160 characters to use a single SMS page.</li>
+          <li v-if="!isWhatsApp">Keep OTPs under 160 characters to use a single SMS page.</li>
+          <li v-else>WhatsApp is billed as one unit per recipient. Recipients must be able to receive WhatsApp.</li>
           <li>Schedule reminders for appointments, events, or payment follow-ups.</li>
           <li>
             Current wallet balance:
             <strong>{{ formatCurrency(wallet.formattedBalance) }}</strong>
+            · {{ formatCurrency(wallet.smsCost) }} per {{ isWhatsApp ? 'WhatsApp' : 'SMS' }} unit
           </li>
         </ul>
       </AppCard>

@@ -9,6 +9,8 @@ declare module 'vue-router' {
     roles?: UserRole[]
     title?: string
     layout?: 'dashboard' | 'marketing'
+    channel?: 'SMS' | 'WHATSAPP'
+    docId?: string
   }
 }
 
@@ -91,6 +93,12 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/dashboard/DataBundlesView.vue'),
         meta: { title: 'Data Bundles' },
       },
+      {
+        path: 'developers',
+        name: 'developers',
+        component: () => import('@/views/docs/DeveloperDocsView.vue'),
+        meta: { title: 'API documentation' },
+      },
     ],
   },
   {
@@ -118,13 +126,35 @@ const routes: RouteRecordRaw[] = [
         path: 'send-sms',
         name: 'send-sms',
         component: () => import('@/views/dashboard/SendSmsView.vue'),
-        meta: { requiresAuth: true, title: 'Send SMS', roles: ['ORGANIZATION_ADMIN'] },
+        meta: { requiresAuth: true, title: 'Send SMS', roles: ['ORGANIZATION_ADMIN'], channel: 'SMS' },
+      },
+      {
+        path: 'send-whatsapp',
+        name: 'send-whatsapp',
+        component: () => import('@/views/dashboard/SendSmsView.vue'),
+        meta: {
+          requiresAuth: true,
+          title: 'Send WhatsApp',
+          roles: ['ORGANIZATION_ADMIN'],
+          channel: 'WHATSAPP',
+        },
       },
       {
         path: 'bulk-sms',
         name: 'bulk-sms',
         component: () => import('@/views/dashboard/BulkSmsView.vue'),
-        meta: { requiresAuth: true, title: 'Bulk SMS', roles: ['ORGANIZATION_ADMIN'] },
+        meta: { requiresAuth: true, title: 'Bulk SMS', roles: ['ORGANIZATION_ADMIN'], channel: 'SMS' },
+      },
+      {
+        path: 'bulk-whatsapp',
+        name: 'bulk-whatsapp',
+        component: () => import('@/views/dashboard/BulkSmsView.vue'),
+        meta: {
+          requiresAuth: true,
+          title: 'Bulk WhatsApp',
+          roles: ['ORGANIZATION_ADMIN'],
+          channel: 'WHATSAPP',
+        },
       },
       {
         path: 'data-bundles/history',
@@ -149,10 +179,27 @@ const routes: RouteRecordRaw[] = [
         },
       },
       {
+        path: 'api-clients',
+        name: 'api-clients',
+        component: () => import('@/views/dashboard/ApiClientsView.vue'),
+        meta: { requiresAuth: true, title: 'API clients', roles: ['ORGANIZATION_ADMIN'] },
+      },
+      {
         path: 'sms-history',
         name: 'sms-history',
         component: () => import('@/views/dashboard/SmsHistoryView.vue'),
-        meta: { requiresAuth: true, title: 'SMS History', roles: ['ORGANIZATION_ADMIN'] },
+        meta: { requiresAuth: true, title: 'SMS History', roles: ['ORGANIZATION_ADMIN'], channel: 'SMS' },
+      },
+      {
+        path: 'whatsapp-history',
+        name: 'whatsapp-history',
+        component: () => import('@/views/dashboard/SmsHistoryView.vue'),
+        meta: {
+          requiresAuth: true,
+          title: 'WhatsApp History',
+          roles: ['ORGANIZATION_ADMIN'],
+          channel: 'WHATSAPP',
+        },
       },
       {
         path: 'reports',
@@ -197,6 +244,132 @@ const routes: RouteRecordRaw[] = [
         name: 'admin-sms-monitoring',
         component: () => import('@/views/admin/SmsMonitoringView.vue'),
         meta: { requiresAuth: true, title: 'SMS Monitoring', roles: ['SUPER_ADMIN'] },
+      },
+      {
+        path: 'admin/api-clients',
+        redirect: { name: 'admin-developer-clients' },
+      },
+      {
+        path: 'admin/developer',
+        component: () => import('@/views/admin/developer/DeveloperPortalLayout.vue'),
+        meta: { requiresAuth: true, roles: ['SUPER_ADMIN'] },
+        redirect: { name: 'admin-developer-overview' },
+        children: [
+          {
+            path: '',
+            name: 'admin-developer-overview',
+            component: () => import('@/views/admin/developer/DeveloperDocView.vue'),
+            meta: { title: 'API Overview', docId: 'overview' },
+          },
+          {
+            path: 'quick-start',
+            name: 'admin-developer-quick-start',
+            component: () => import('@/views/admin/developer/DeveloperDocView.vue'),
+            meta: { title: 'Quick Start', docId: 'quick-start' },
+          },
+          {
+            path: 'authentication',
+            name: 'admin-developer-authentication',
+            component: () => import('@/views/admin/developer/DeveloperDocView.vue'),
+            meta: { title: 'Authentication', docId: 'authentication' },
+          },
+          {
+            path: 'send-sms',
+            name: 'admin-developer-send-sms',
+            component: () => import('@/views/admin/developer/DeveloperDocView.vue'),
+            meta: { title: 'Send SMS', docId: 'send-sms' },
+          },
+          {
+            path: 'bulk-sms',
+            name: 'admin-developer-bulk-sms',
+            component: () => import('@/views/admin/developer/DeveloperDocView.vue'),
+            meta: { title: 'Bulk SMS', docId: 'bulk-sms' },
+          },
+          {
+            path: 'status',
+            name: 'admin-developer-status',
+            component: () => import('@/views/admin/developer/DeveloperDocView.vue'),
+            meta: { title: 'SMS Status', docId: 'status' },
+          },
+          {
+            path: 'history',
+            name: 'admin-developer-history',
+            component: () => import('@/views/admin/developer/DeveloperDocView.vue'),
+            meta: { title: 'SMS History', docId: 'history' },
+          },
+          {
+            path: 'errors',
+            name: 'admin-developer-errors',
+            component: () => import('@/views/admin/developer/DeveloperDocView.vue'),
+            meta: { title: 'API Errors', docId: 'errors' },
+          },
+          {
+            path: 'idempotency',
+            name: 'admin-developer-idempotency',
+            component: () => import('@/views/admin/developer/DeveloperDocView.vue'),
+            meta: { title: 'Idempotency', docId: 'idempotency' },
+          },
+          {
+            path: 'rate-limits',
+            name: 'admin-developer-rate-limits',
+            component: () => import('@/views/admin/developer/DeveloperDocView.vue'),
+            meta: { title: 'Rate Limits', docId: 'rate-limits' },
+          },
+          {
+            path: 'integration/spring-boot',
+            name: 'admin-developer-spring',
+            component: () => import('@/views/admin/developer/DeveloperDocView.vue'),
+            meta: { title: 'Spring Boot', docId: 'spring-boot' },
+          },
+          {
+            path: 'integration/nodejs',
+            name: 'admin-developer-nodejs',
+            component: () => import('@/views/admin/developer/DeveloperDocView.vue'),
+            meta: { title: 'Node.js', docId: 'nodejs' },
+          },
+          {
+            path: 'integration/php',
+            name: 'admin-developer-php',
+            component: () => import('@/views/admin/developer/DeveloperDocView.vue'),
+            meta: { title: 'PHP', docId: 'php' },
+          },
+          {
+            path: 'integration/python',
+            name: 'admin-developer-python',
+            component: () => import('@/views/admin/developer/DeveloperDocView.vue'),
+            meta: { title: 'Python', docId: 'python' },
+          },
+          {
+            path: 'integration/generic-http',
+            name: 'admin-developer-http',
+            component: () => import('@/views/admin/developer/DeveloperDocView.vue'),
+            meta: { title: 'Generic HTTP', docId: 'generic-http' },
+          },
+          {
+            path: 'clients',
+            name: 'admin-developer-clients',
+            component: () => import('@/views/dashboard/ApiClientsView.vue'),
+            meta: { title: 'API Clients' },
+          },
+          {
+            path: 'usage',
+            name: 'admin-developer-usage',
+            component: () => import('@/views/admin/developer/DeveloperUsageView.vue'),
+            meta: { title: 'API Usage' },
+          },
+          {
+            path: 'console',
+            name: 'admin-developer-console',
+            component: () => import('@/views/admin/developer/DeveloperConsoleView.vue'),
+            meta: { title: 'API Test Console' },
+          },
+          {
+            path: 'provider',
+            name: 'admin-developer-provider',
+            component: () => import('@/views/admin/developer/DeveloperDocView.vue'),
+            meta: { title: 'TalkSasa (internal)', docId: 'provider' },
+          },
+        ],
       },
       {
         path: 'admin/system-reports',

@@ -14,4 +14,6 @@ public interface ContactGroupRepository extends JpaRepository<ContactGroup, UUID
     Optional<ContactGroup> findByIdAndOrganizationId(UUID id, UUID organizationId);
 
     boolean existsByOrganizationIdAndNameIgnoreCase(UUID organizationId, String name);
+
+    boolean existsByOrganizationIdAndNameIgnoreCaseAndIdNot(UUID organizationId, String name, UUID id);
 }

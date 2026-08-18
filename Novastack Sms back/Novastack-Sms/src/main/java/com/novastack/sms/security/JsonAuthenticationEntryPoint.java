@@ -25,8 +25,10 @@ public class JsonAuthenticationEntryPoint implements AuthenticationEntryPoint {
             AuthenticationException authException) throws IOException {
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-        objectMapper.writeValue(
-                response.getOutputStream(),
-                ApiResponse.fail("Session expired. Please sign in again."));
+        String apiKey = request.getHeader("X-API-Key");
+        String message = (apiKey != null && !apiKey.isBlank())
+                ? "Invalid API key."
+                : "Session expired. Please sign in again.";
+        objectMapper.writeValue(response.getOutputStream(), ApiResponse.fail(message));
     }
 }

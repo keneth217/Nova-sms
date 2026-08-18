@@ -1,5 +1,7 @@
 package com.novastack.sms.domain.entity;
 
+import com.novastack.sms.domain.enums.BillingStatus;
+import com.novastack.sms.domain.enums.MessageChannel;
 import com.novastack.sms.domain.enums.MessageStatus;
 import jakarta.persistence.*;
 import lombok.*;
@@ -32,11 +34,19 @@ public class SmsMessage {
     @JoinColumn(name = "organization_id", nullable = false)
     private Organization organization;
 
+    @Column(name = "api_client_id")
+    private UUID apiClientId;
+
     @Column(name = "recipient", nullable = false, length = 20)
     private String recipient;
 
     @Column(nullable = false, length = 1600)
     private String content;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    @Builder.Default
+    private MessageChannel channel = MessageChannel.SMS;
 
     @Column(name = "sender_id", nullable = false, length = 11)
     private String senderId;
@@ -48,6 +58,41 @@ public class SmsMessage {
 
     @Column(nullable = false, precision = 10, scale = 4)
     private BigDecimal cost;
+
+    @Column(name = "sms_units", nullable = false)
+    @Builder.Default
+    private int smsUnits = 1;
+
+    @Column(length = 10)
+    private String encoding;
+
+    @Column(name = "character_count")
+    private Integer characterCount;
+
+    @Column(name = "unit_price", precision = 10, scale = 4)
+    private BigDecimal unitPrice;
+
+    @Column(name = "provider_cost", precision = 10, scale = 4)
+    private BigDecimal providerCost;
+
+    @Column(name = "gross_margin", precision = 10, scale = 4)
+    private BigDecimal grossMargin;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "billing_status", nullable = false, length = 20)
+    @Builder.Default
+    private BillingStatus billingStatus = BillingStatus.CHARGED;
+
+    @Column(length = 3)
+    @Builder.Default
+    private String currency = "KES";
+
+    @Column(length = 40)
+    private String provider;
+
+    /** Who triggers a scheduled send: NOVA (local dispatcher) or PROVIDER. */
+    @Column(name = "schedule_owner", length = 20)
+    private String scheduleOwner;
 
     @Column(name = "provider_message_id", length = 100)
     private String providerMessageId;

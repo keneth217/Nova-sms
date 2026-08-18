@@ -20,6 +20,7 @@ export const useWalletStore = defineStore('wallet', () => {
 
   const formattedBalance = computed(() => balance.value?.balance ?? 0)
   const smsCost = computed(() => balance.value?.smsCost ?? 1)
+  const availableSms = computed(() => balance.value?.availableSms ?? Math.floor(formattedBalance.value / smsCost.value))
   const currency = computed(() => balance.value?.currency ?? 'KES')
 
   async function fetchBalance() {
@@ -79,6 +80,7 @@ export const useWalletStore = defineStore('wallet', () => {
     error,
     formattedBalance,
     smsCost,
+    availableSms,
     currency,
     fetchBalance,
     fetchTransactions,

@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -63,12 +64,27 @@ public class SenderIdService {
         return senderIdRepository.save(entity);
     }
 
-    /**
-     * Sender is chosen by the platform — clients cannot pick one.
-     * Order: approved platform default (NOVASTACK) → approved org sender → config fallback.
-     */
     @Transactional(readOnly = true)
-    public String resolveApprovedSender(UUID organizationId, String ignoredClientSenderId) {
+    public String resolveApprovedSender(UUID organizationId, String requestedSenderId) {
+        if (requestedSenderId != null && !requestedSenderId.isBlank()) {
+            String name = requestedSenderId.trim();
+            Optional<SenderId> orgSender = senderIdRepository
+                    .findByOrganizationIdAndSenderNameIgnoreCase(organizationId, name);
+            if (orgSender.isPresent() && orgSender.get().getStatus() == SenderIdStatus.APPROVED) {
+                return orgSender.get().getSenderName();
+            }
+            Optional<SenderId> platform = senderIdRepository.findFirstByPlatformDefaultTrueAndStatus(SenderIdStatus.APPROVED);
+            if (platform.isPresent() && platform.get().getSenderName().equalsIgnoreCase(name)) {
+                return platform.get().getSenderName();
+            }
+            if (isTalksasa() && isTalksasaDefaultAlias(name)) {
+                return talksasaDefaultSender();
+            }
+            throw new ApiException("Sender ID is not approved for this organization", HttpStatus.BAD_REQUEST);
+        }
+        if (isTalksasa()) {
+            return talksasaDefaultSender();
+        }
         return senderIdRepository.findFirstByPlatformDefaultTrueAndStatus(SenderIdStatus.APPROVED)
                 .map(SenderId::getSenderName)
                 .or(() -> senderIdRepository
@@ -76,5 +92,21 @@ public class SenderIdService {
                                 organizationId, SenderIdStatus.APPROVED)
                         .map(SenderId::getSenderName))
                 .orElseGet(() -> appProperties.getSms().getPlatformSenderId().toUpperCase());
+    }
+
+    private boolean isTalksasa() {
+        String provider = appProperties.getSms().getProvider();
+        return provider == null || provider.isBlank() || "talksasa".equalsIgnoreCase(provider.trim());
+    }
+
+    private String talksasaDefaultSender() {
+        return appProperties.getSms().getTalksasa().resolvedDefaultSenderId();
+    }
+
+    private boolean isTalksasaDefaultAlias(String name) {
+        String configured = talksasaDefaultSender();
+        return configured.equalsIgnoreCase(name)
+                || "TALK-SASA".equalsIgnoreCase(name)
+                || "TALK_SASA".equalsIgnoreCase(name);
     }
 }

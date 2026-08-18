@@ -109,19 +109,22 @@ public class AfricasTalkingSmsProvider implements SmsProvider {
 
             return parseRecipientResults(recipients, rawRequest, responseBody);
         } catch (RestClientResponseException ex) {
-            log.error("AT SMS HTTP error status={} body={}", ex.getStatusCode().value(), ex.getResponseBodyAsString());
+            int status = ex.getStatusCode().value();
+            log.error("AT SMS HTTP error status={} body={}", status, ex.getResponseBodyAsString());
             String error = extractHttpError(ex);
+            boolean retryable = ProviderErrorMessages.isRetryable(status, false);
             for (String recipient : recipients) {
                 byRecipient.put(normalizePhoneKey(recipient),
                         SmsProviderResult.failure(rawRequest, ex.getResponseBodyAsString(),
-                                ex.getStatusCode().value(), error));
+                                status, customerAtError(status, error), retryable));
             }
             return byRecipient;
         } catch (Exception ex) {
-            log.error("AT SMS send failed: {}", ex.getMessage(), ex);
+            log.error("AT SMS send failed: {}", ex.getMessage());
+            boolean retryable = ProviderErrorMessages.isRetryable(null, true);
             for (String recipient : recipients) {
                 byRecipient.put(normalizePhoneKey(recipient),
-                        SmsProviderResult.failure(rawRequest, null, null, ex.getMessage()));
+                        SmsProviderResult.failure(rawRequest, null, null, ProviderErrorMessages.UNAVAILABLE, retryable));
             }
             return byRecipient;
         }
@@ -157,10 +160,10 @@ public class AfricasTalkingSmsProvider implements SmsProvider {
                 String cost = item.path("cost").asText(null);
 
                 if (isAccepted(statusCode, status)) {
-                    byRecipient.put(key, new SmsProviderResult(true, messageId, rawRequest, responseBody, statusCode, null));
+                    byRecipient.put(key, SmsProviderResult.accepted(messageId, rawRequest, responseBody, statusCode));
                 } else {
                     String error = describeStatus(statusCode, status, cost);
-                    byRecipient.put(key, SmsProviderResult.failure(rawRequest, responseBody, statusCode, error));
+                    byRecipient.put(key, SmsProviderResult.failure(rawRequest, responseBody, statusCode, error, false));
                 }
             }
             return byRecipient;
@@ -249,6 +252,18 @@ public class AfricasTalkingSmsProvider implements SmsProvider {
         }
 
         return new Credentials(resolvedUsername, resolvedApiKey, resolvedBaseUrl, null);
+    }
+
+    private String customerAtError(int status, String vendorMessage) {
+        if (status == 401 || status == 403) {
+            return ProviderErrorMessages.forHttpStatus(status);
+        }
+        if (status >= 500) {
+            return ProviderErrorMessages.UNAVAILABLE;
+        }
+        return vendorMessage != null && !vendorMessage.isBlank()
+                ? vendorMessage
+                : ProviderErrorMessages.forHttpStatus(status);
     }
 
     private String extractHttpError(RestClientResponseException ex) {

@@ -38,6 +38,9 @@ public class ContactGroup {
     @Column(length = 255)
     private String description;
 
+    @Column(name = "provider_group_uid", length = 64, unique = true)
+    private String providerGroupUid;
+
     @ManyToMany(mappedBy = "groups")
     @JsonIgnoreProperties("groups")
     @Builder.Default

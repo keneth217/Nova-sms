@@ -3,12 +3,18 @@ export interface DashboardReport {
   smsSentThisMonth: number
   deliveredCount: number
   failedCount: number
+  pendingCount?: number
   deliveryRate: number
   walletBalance: number
   walletUsageToday: number
   walletUsageThisMonth: number
   costToday: number
   costThisMonth: number
+  smsPrice?: number
+  availableSms?: number
+  smsSent?: number
+  totalSmsUnits?: number
+  totalAmountSpent?: number
   activeSenderIds?: number
 }
 

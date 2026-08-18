@@ -1,6 +1,7 @@
 package com.novastack.sms.domain.entity;
 
 import com.novastack.sms.domain.enums.OrganizationAccountType;
+import com.novastack.sms.domain.enums.OrganizationBillingModel;
 import com.novastack.sms.domain.enums.OrganizationStatus;
 import jakarta.persistence.*;
 import lombok.*;
@@ -53,6 +54,11 @@ public class Organization {
     @Column(name = "account_type", nullable = false, length = 20)
     @Builder.Default
     private OrganizationAccountType accountType = OrganizationAccountType.BUSINESS;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "billing_model", nullable = false, length = 20)
+    @Builder.Default
+    private OrganizationBillingModel billingModel = OrganizationBillingModel.PREPAID;
 
     /** When set (EVENT accounts), login and sending stop after this instant. */
     @Column(name = "expires_at")

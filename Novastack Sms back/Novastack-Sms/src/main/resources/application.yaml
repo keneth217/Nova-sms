@@ -53,6 +53,8 @@ springdoc:
     operationsSorter: method
 
 novastack:
+  api:
+    public-base-url: ${NOVA_SMS_API_BASE_URL:https://smsapi.novastack.co.ke}
   frontend:
     base-url: ${FRONTEND_BASE_URL:https://novasms.novastack.co.ke}
   mail:
@@ -62,9 +64,29 @@ novastack:
     secret: NovastackSmsGatewayJwtSecretKeyThatIsLongEnoughForHS256ProductionUse2026
     expiration-ms: 86400000
   sms:
+    provider: ${SMS_PROVIDER:talksasa}
     default-cost: 1.00
     platform-sender-id: NOVASTACK
     max-retries: 3
+    batch-size: ${SMS_BATCH_SIZE:100}
+    pricing:
+      price-per-unit: ${SMS_PRICE_PER_UNIT:1.00}
+      currency: ${SMS_CURRENCY:KES}
+    billing:
+      customer-price: ${SMS_BILLING_CUSTOMER_PRICE:${SMS_PRICE_PER_UNIT:1.00}}
+      provider-cost: ${SMS_BILLING_PROVIDER_COST:0.35}
+      currency: ${SMS_BILLING_CURRENCY:${SMS_CURRENCY:KES}}
+    status-sync:
+      enabled: ${SMS_STATUS_SYNC_ENABLED:true}
+      cron: ${SMS_STATUS_SYNC_CRON:0 */5 * * * *}
+      batch-size: ${SMS_STATUS_SYNC_BATCH_SIZE:50}
+    talksasa:
+      base-url: ${TALKSASA_BASE_URL:https://bulksms.talksasa.com/api/v3}
+      api-token: ${TALKSASA_API_TOKEN:4146|qkHeGBhoB5SaWz9lSu7vzX6HJpWVlpQwzTwqPDUGd16ea17b}
+      default-sender-id: ${TALKSASA_SENDER_ID:TALK-SASA}
+      connect-timeout-ms: ${TALKSASA_CONNECT_TIMEOUT_MS:5000}
+      read-timeout-ms: ${TALKSASA_READ_TIMEOUT_MS:30000}
+      sync-contact-groups: ${TALKSASA_SYNC_CONTACT_GROUPS:true}
   africastalking:
     # Live Africa's Talking — set AT_USERNAME to your production app username (not "sandbox")
     username: ${AT_USERNAME:}

@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { useSmsStore } from '@/stores/sms.store'
 import { useWalletStore } from '@/stores/wallet.store'
 import { contactService } from '@/api/contact.service'
 import type { Contact, ContactGroup } from '@/models/contact.model'
+import type { MessageChannel } from '@/models/sms.model'
 import PageHeader from '@/components/common/PageHeader.vue'
 import AppCard from '@/components/common/AppCard.vue'
 import AppButton from '@/components/common/AppButton.vue'
@@ -11,12 +13,26 @@ import AppInput from '@/components/common/AppInput.vue'
 import AppSelect from '@/components/common/AppSelect.vue'
 import FormField from '@/components/common/FormField.vue'
 import ContactPicker from '@/components/common/ContactPicker.vue'
-import { estimateSmsCost, formatCurrency, formatDate, parsePhoneList, smsPageCount, summarizeBulkSmsResult } from '@/utils/format'
+import {
+  estimateSmsCost,
+  estimateWhatsAppCost,
+  formatCurrency,
+  formatDate,
+  parsePhoneList,
+  analyzeSms,
+  summarizeBulkSmsResult,
+} from '@/utils/format'
 
 type RecipientSource = 'contacts' | 'group' | 'manual'
 
+const route = useRoute()
 const sms = useSmsStore()
 const wallet = useWalletStore()
+const channel = computed<MessageChannel>(() =>
+  route.meta.channel === 'WHATSAPP' ? 'WHATSAPP' : 'SMS',
+)
+const isWhatsApp = computed(() => channel.value === 'WHATSAPP')
+const channelLabel = computed(() => (isWhatsApp.value ? 'WhatsApp' : 'SMS'))
 const groups = ref<ContactGroup[]>([])
 const contacts = ref<Contact[]>([])
 const selectedContactIds = ref<string[]>([])
@@ -50,8 +66,14 @@ const recipientCount = computed(() => {
   return pastedRecipients.value.length
 })
 
-const pages = computed(() => smsPageCount(form.message))
-const cost = computed(() => estimateSmsCost(form.message, recipientCount.value, wallet.smsCost))
+const pages = computed(() => (isWhatsApp.value ? (form.message ? 1 : 0) : analyzeSms(form.message).units))
+const encoding = computed(() => analyzeSms(form.message).encoding)
+const cost = computed(() =>
+  isWhatsApp.value
+    ? estimateWhatsAppCost(form.message, recipientCount.value, wallet.smsCost)
+    : estimateSmsCost(form.message, recipientCount.value, wallet.smsCost),
+)
+const remainingAfter = computed(() => wallet.formattedBalance - cost.value)
 
 const minScheduleLocal = computed(() => {
   const d = new Date(Date.now() + 60_000)
@@ -128,16 +150,20 @@ async function onSubmit() {
         error.value = 'Reminder time must be in the future.'
         return
       }
-      const result = await sms.scheduleSms({
-        ...payload,
-        scheduledAt: when.toISOString(),
-      })
+      const result = await sms.scheduleSms(
+        {
+          ...payload,
+          scheduledAt: when.toISOString(),
+        },
+        channel.value,
+      )
       success.value = `Reminder scheduled for ${formatDate(when.toISOString())}: ${result.queuedCount} messages (batch ${result.batchId}).`
     } else {
-      const result = await sms.sendBulk(payload)
+      const result = await sms.sendBulk(payload, channel.value)
       const summary = summarizeBulkSmsResult(result)
       if (summary.ok) success.value = summary.text
       else error.value = summary.text
+      await wallet.fetchBalance()
     }
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Campaign failed'
@@ -148,8 +174,12 @@ async function onSubmit() {
 <template>
   <div>
     <PageHeader
-      title="Bulk SMS"
-      description="Send to selected contacts, a group, or pasted / CSV numbers."
+      :title="`Bulk ${channelLabel}`"
+      :description="
+        isWhatsApp
+          ? 'Send WhatsApp to selected contacts, a group, or pasted / CSV numbers.'
+          : 'Send to selected contacts, a group, or pasted / CSV numbers.'
+      "
     />
 
     <div class="grid gap-6 lg:grid-cols-3">
@@ -252,7 +282,7 @@ async function onSubmit() {
             :loading="sms.loading"
             :disabled="!form.message || recipientCount === 0 || (form.sendLater && !form.scheduledAt)"
           >
-            {{ form.sendLater ? 'Schedule reminder' : 'Send campaign' }}
+            {{ form.sendLater ? 'Schedule reminder' : `Send ${channelLabel} campaign` }}
           </AppButton>
         </form>
       </AppCard>
@@ -264,8 +294,16 @@ async function onSubmit() {
             <dd class="font-semibold text-slate-900">{{ recipientCount }}</dd>
           </div>
           <div class="flex justify-between">
-            <dt class="text-slate-500">SMS pages</dt>
-            <dd class="font-semibold text-slate-900">{{ pages }}</dd>
+            <dt class="text-slate-500">Characters</dt>
+            <dd class="font-semibold text-slate-900">{{ form.message.length }}</dd>
+          </div>
+          <div class="flex justify-between">
+            <dt class="text-slate-500">{{ isWhatsApp ? 'WhatsApp units' : 'SMS units' }}</dt>
+            <dd class="font-semibold text-slate-900">
+              {{ pages }}
+              <span v-if="!isWhatsApp" class="text-xs font-normal text-slate-400">({{ encoding }})</span>
+              <span v-else class="text-xs font-normal text-slate-400">(1 per recipient)</span>
+            </dd>
           </div>
           <div class="flex justify-between">
             <dt class="text-slate-500">Unit cost</dt>
@@ -274,6 +312,10 @@ async function onSubmit() {
           <div class="border-t border-slate-100 pt-4 flex justify-between">
             <dt class="text-slate-500">Estimated total</dt>
             <dd class="text-lg font-semibold text-brand-700">{{ formatCurrency(cost) }}</dd>
+          </div>
+          <div class="flex justify-between">
+            <dt class="text-slate-500">Balance after sending</dt>
+            <dd class="font-semibold text-slate-900">{{ formatCurrency(remainingAfter) }}</dd>
           </div>
           <p v-if="form.sendLater && form.scheduledAt" class="text-xs text-slate-500">
             Will send {{ formatDate(new Date(form.scheduledAt).toISOString()) }}

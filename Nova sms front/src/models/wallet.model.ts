@@ -7,6 +7,7 @@ export interface WalletBalance {
   balance: number
   currency: string
   smsCost: number
+  availableSms?: number
 }
 
 export interface WalletTopupRequest {

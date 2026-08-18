@@ -1,6 +1,49 @@
 # Nova SMS
 
-Nova SMS is a multi-tenant messaging platform for businesses, event organizers, and other groups that need to send single, bulk, or scheduled SMS messages. It combines a Vue dashboard with a Spring Boot API, prepaid organization wallets, M-Pesa funding, contact management, sender IDs, delivery tracking, and administrative reporting.
+Centralized SMS SaaS Platform & SMS Gateway
+
+Nova SMS is both:
+
+1. A standalone multi-tenant SMS SaaS platform (dashboard, wallets, contacts, sender IDs, reports).
+2. An SMS gateway for other applications (Mwalimu Scheme, Chamaplus, Nova POS, SACCO and school systems, other NovaStack apps, and third-party backends).
+
+Integrating applications send SMS through the Nova SMS REST API. They never talk to TalkSasa or any other upstream provider. TalkSasa is the default **internal** delivery provider.
+
+## Main features
+
+- Multi-tenant organizations with prepaid, monthly, or internal wallets
+- Single, bulk, and scheduled SMS (and WhatsApp on the same delivery path)
+- Contact groups, Excel import, and approved sender IDs
+- M-Pesa STK Push wallet funding
+- Delivery tracking with Nova SMS statuses (not raw provider payloads)
+- Super Admin platform management
+- Developer API: hashed `nova_live_…` keys, permissions, rate limits, idempotency
+
+## SaaS vs API gateway
+
+SaaS users sign in with email/password (JWT) and use the Vue dashboard. They do **not** need an API key.
+
+API clients belong to an organization. Super Admin (or the org admin) creates a client, copies the key **once**, and the integrating backend sends `X-API-Key`. Sends debit the same organization wallet and use the same `SmsService` as the dashboard.
+
+```text
+                   NOVA SMS
+                      |
+          +-----------+-----------+
+          |                       |
+      SaaS Users             API Clients
+          |                       |
+          +-----------+-----------+
+                      |
+                  SmsService
+                      |
+              Wallet / billing
+                      |
+              SMS delivery layer
+                      |
+                  TalkSasa
+```
+
+Future providers can be added without changing `POST /api/v1/sms/send`. See `docs/architecture.md`.
 
 ## Repository structure
 
@@ -29,7 +72,7 @@ Backend:
 - Java 21 and Spring Boot 3.4
 - Spring Security with JWT and API-key authentication
 - Spring Data JPA, MySQL 8, and Flyway
-- Africa's Talking for SMS delivery
+- TalkSasa (default) or Africa's Talking for SMS delivery
 - Safaricom Daraja for M-Pesa STK Push
 - Apache POI for Excel contact imports and templates
 - Spring scheduler for delayed SMS delivery
@@ -83,7 +126,7 @@ Manual Paybill payments use the organization's `mpesaAccountRef`. All top-ups an
 
 ### 4. Contacts and groups
 
-Contacts are tenant-isolated and can be created individually, pasted as phone lists, grouped, or imported from Excel.
+Contacts are tenant-isolated and can be created individually, pasted as phone lists, grouped, or imported from Excel. Nova is the source of truth for groups. When TalkSasa sync is enabled, create, rename, and delete also mirror the group on TalkSasa; SMS is still sent from Nova recipient lists. Groups can be renamed or deleted from the Contacts page.
 
 The Excel import format is:
 
@@ -104,16 +147,9 @@ Contact lists can be exported as styled Excel or PDF reports. Exports respect th
 
 ### 5. Sender IDs
 
-Organizations can use the shared platform sender ID or request their own branded sender ID.
+Organizations can request their own branded sender ID. Super administrators review requests (`PENDING` → `APPROVED` / `REJECTED`). An explicit `senderId` on send/bulk must be approved for **that** organization.
 
-Custom sender IDs move through:
-
-```text
-PENDING → APPROVED
-        → REJECTED
-```
-
-Only approved organization sender IDs and the approved platform default can be used to send messages. Super administrators review requests.
+When `senderId` is omitted and TalkSasa is the provider, Nova uses `TALKSASA_SENDER_ID` (default `TALK-SASA`). This is configurable and does not require a code change. The product name remains Nova SMS; `TALK-SASA` is only the TalkSasa sender ID.
 
 ### 6. Sending SMS
 
@@ -123,19 +159,30 @@ For an immediate send, the backend:
 
 1. Resolves and de-duplicates recipients.
 2. Normalizes Kenyan phone numbers to `254XXXXXXXXX`.
-3. Validates the sender ID.
+3. Resolves the sender ID (approved org sender, or TalkSasa default `TALK-SASA` when omitted).
 4. Checks the organization's access and wallet balance.
 5. Debits the wallet.
 6. Stores the SMS record.
-7. Sends through Africa's Talking.
+7. Sends through the configured SMS provider (TalkSasa by default).
 8. Records provider requests, responses, retries, and final status.
 9. Applies delivery reports and refunds according to the failure path.
 
 Typical message states are:
 
 ```text
-QUEUED → SENT → DELIVERED
-              → FAILED
+PENDING → ACCEPTED → SENT → DELIVERED
+                           → FAILED / REJECTED
+```
+
+### 6b. Sending WhatsApp
+
+WhatsApp uses the same TalkSasa send API with `type=whatsapp`. Nova stores the message, debits the wallet (1 unit per recipient), and schedules locally. Recipients must be able to receive WhatsApp.
+
+```http
+POST /api/v1/whatsapp/send
+POST /api/v1/whatsapp/bulk
+POST /api/v1/whatsapp/schedule
+GET  /api/v1/whatsapp/history
 ```
 
 ### 7. Scheduled reminders
@@ -154,7 +201,7 @@ Scheduled messages and their send times are visible in SMS History.
 
 ### 8. Delivery reports
 
-Africa's Talking posts delivery updates to:
+TalkSasa delivery is tracked by storing the provider UID and periodically syncing in-flight messages (`GET /sms/{uid}`). Africa's Talking can still post delivery updates to:
 
 ```http
 POST /api/v1/dlr/callback
@@ -201,6 +248,18 @@ Flyway creates and upgrades the schema automatically at startup. Do not use the 
 Set the required environment variables before starting the backend:
 
 ```env
+NOVA_SMS_API_BASE_URL=https://smsapi.novastack.co.ke
+SMS_PROVIDER=talksasa
+TALKSASA_API_TOKEN=your-talksasa-token
+TALKSASA_SENDER_ID=TALK-SASA
+TALKSASA_BASE_URL=https://bulksms.talksasa.com/api/v3
+TALKSASA_SYNC_CONTACT_GROUPS=true
+SMS_BATCH_SIZE=100
+SMS_PRICE_PER_UNIT=1.00
+SMS_CURRENCY=KES
+
+# Optional fallback provider
+# SMS_PROVIDER=africastalking
 AT_USERNAME=sandbox
 AT_API_KEY=your-africas-talking-api-key
 AT_BASE_URL=https://api.sandbox.africastalking.com
@@ -297,15 +356,45 @@ Authenticated dashboard requests send:
 Authorization: Bearer <accessToken>
 ```
 
-### API key
+### API key (integrations)
 
-An organization API key is returned during registration. Programmatic clients can send:
+Create an API client in Super Admin → Developer → API Clients (or Dashboard → API clients). Send the live key on every request:
 
 ```http
-X-API-Key: nsk_...
+X-API-Key: nova_live_xxxxxxxxxxxxxxxxx
 ```
 
-API keys are organization-scoped and must be stored securely.
+```bash
+export NOVA_SMS_API_KEY="nova_live_xxxxxxxxx"
+export NOVA_SMS_API_URL="https://smsapi.novastack.co.ke"
+```
+
+The full key is shown only once. Nova stores a SHA-256 hash. Revoked keys stop immediately. Never put the key in frontend JavaScript or Git.
+
+Legacy `nsk_…` organization keys still authenticate as the full organization. New integrations should use `nova_live_…` clients.
+
+### Example send
+
+```bash
+curl -X POST "${NOVA_SMS_API_URL}/api/v1/sms/send" \
+  -H "X-API-Key: ${NOVA_SMS_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "recipient": "254712345678",
+    "message": "Hello from Nova SMS"
+  }'
+```
+
+The JSON envelope is `{ "success", "message", "data" }`. `data.id` is a UUID. See `docs/api/send-sms.md`.
+
+For complete API documentation see:
+
+```text
+docs/api/
+docs/integration/
+```
+
+In the running app: Super Admin → Developer, public page `/developers`, and Swagger UI `{origin}/swagger-ui.html`. Production origin is configured with `NOVA_SMS_API_BASE_URL` (default `https://smsapi.novastack.co.ke`).
 
 ## Main API areas
 
@@ -324,10 +413,22 @@ API keys are organization-scoped and must be stored securely.
 - `POST /api/v1/sms/bulk` — send to numbers and/or a contact group
 - `POST /api/v1/sms/schedule` — schedule messages for later
 - `GET /api/v1/sms/history` — list sent and scheduled messages
+- `GET /api/v1/sms/{id}` — get one SMS (tenant-scoped)
+- `GET /api/v1/sms/{id}/status` — refresh provider status
+- `POST /api/v1/whatsapp/send` — send one WhatsApp message
+- `POST /api/v1/whatsapp/bulk` — send WhatsApp to numbers and/or a contact group
+- `POST /api/v1/whatsapp/schedule` — schedule WhatsApp for later
+- `GET /api/v1/whatsapp/history` — list WhatsApp messages
+- `GET /api/v1/whatsapp/{id}` — get one WhatsApp message (tenant-scoped)
+- `GET /api/v1/whatsapp/{id}/status` — refresh WhatsApp provider status
 - `/api/v1/contacts/**` — contacts, groups, imports, and template download
+- `/api/v1/api-clients/**` — hashed Nova SMS API keys (create/rotate/revoke)
+- `GET /api/v1/admin/api-clients` — platform API clients
+- `POST /api/v1/admin/organizations` — create internal/SaaS organizations
 - `/api/v1/sender-ids/**` — sender-ID requests and reviews
 - `GET /api/v1/reports/dashboard` — organization dashboard metrics
 - `/api/v1/admin/**` — super-administrator operations
+- `GET /api/v1/admin/talksasa` — TalkSasa platform profile and SMS units
 
 Full request and response schemas are available in Swagger UI.
 
@@ -338,6 +439,11 @@ Flyway migrations currently cover:
 - Initial organizations, users, wallets, SMS, contacts, sender IDs, and provider logs
 - M-Pesa Daraja transaction and organization account-reference fields
 - Business and event organization account types
+- TalkSasa SMS unit, provider, currency, and schedule-owner columns (`V13`)
+- TalkSasa contact-group UID on Nova groups (`V14`)
+- SMS vs WhatsApp channel on messages (`V15`)
+- TalkSasa contact UID per group membership (`V16`)
+- API clients, idempotency keys, billing model, SMS client metadata (`V17`)
 
 At startup, the application ensures:
 
@@ -363,20 +469,47 @@ cd "Novastack Sms back\Novastack-Sms"
 .\mvnw.cmd clean verify
 ```
 
+## Security
+
+- Never put a Nova SMS API key in frontend JavaScript.
+- Never commit API keys, JWTs, TalkSasa tokens, or M-Pesa secrets to Git.
+- Never expose the API key to browser users.
+- Scoped live keys can only call `/api/v1/sms/**`.
+- Serve the API over HTTPS in production.
+
 ## Production checklist
 
 - Replace all example credentials and secrets.
 - Move datasource and JWT configuration to environment-specific secrets.
-- Use production Africa's Talking and Daraja endpoints.
+- Use production TalkSasa and Daraja endpoints.
 - Serve the API through HTTPS.
 - Set the public M-Pesa and DLR callback URLs.
 - Restrict CORS to the deployed frontend origin.
 - Back up MySQL and monitor Flyway migrations.
 - Monitor `/actuator/health`, provider errors, pending top-ups, and scheduled-message dispatch.
 - Build the frontend with `VITE_USE_MOCK=false`.
-- Keep API keys, JWTs, M-Pesa credentials, and provider credentials out of source control.
+- Keep API keys, JWTs, M-Pesa credentials, TalkSasa tokens, and other provider credentials out of source control.
+
+## How other applications integrate
+
+1. Super Admin creates (or funds) the organization wallet.
+2. Super Admin → Developer → API Clients → create a client for that org.
+3. Copy the `nova_live_…` key once and store it as `NOVA_SMS_API_KEY`.
+4. From **your backend**, `POST /api/v1/sms/send` with `X-API-Key`.
+5. Read `data.id` / `data.status`. Optionally `GET /api/v1/sms/{id}/status`.
+
+Correct architecture:
+
+```text
+Browser → Your Backend → Nova SMS API → (internal TalkSasa)
+```
 
 ## Additional documentation
 
+- Developer docs: `docs/README.md`
+- API reference: `docs/api/`
+- Integration examples: `docs/integration/`
+- Architecture: `docs/architecture.md`
+- TalkSasa (internal only): `docs/providers/talksasa.md`
 - Frontend notes: `Nova sms front/README.md`
-- Backend and API examples: `Novastack Sms back/Novastack-Sms/README.md`
+- Backend notes: `Novastack Sms back/Novastack-Sms/README.md`

@@ -27,14 +27,47 @@ export function formatPercent(value: number, digits = 1): string {
 }
 
 export function smsPageCount(message: string): number {
-  const length = message.length
-  if (length === 0) return 0
-  if (length <= 160) return 1
-  return Math.ceil(length / 153)
+  return analyzeSms(message).units
+}
+
+export function analyzeSms(message: string): { encoding: 'GSM-7' | 'Unicode'; characters: number; units: number } {
+  if (!message) return { encoding: 'GSM-7', characters: 0, units: 0 }
+  if (isGsm7(message)) {
+    const septets = gsm7SeptetCount(message)
+    const units = septets <= 160 ? 1 : Math.ceil(septets / 153)
+    return { encoding: 'GSM-7', characters: message.length, units }
+  }
+  const units = message.length <= 70 ? 1 : Math.ceil(message.length / 67)
+  return { encoding: 'Unicode', characters: message.length, units }
+}
+
+const GSM7_BASIC =
+  '@£$¥èéùìòÇ\nØø\rÅåΔ_ΦΓΛΩΠΨΣΘΞÆæßÉ !"#¤%&\'()*+,-./0123456789:;<=>?' +
+  '¡ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÑÜ§¿abcdefghijklmnopqrstuvwxyzäöñüà'
+const GSM7_EXTENDED = new Set('|€{}[]~\\^')
+
+function isGsm7(message: string): boolean {
+  for (const char of message) {
+    if (!GSM7_BASIC.includes(char) && !GSM7_EXTENDED.has(char)) return false
+  }
+  return true
+}
+
+function gsm7SeptetCount(message: string): number {
+  let count = 0
+  for (const char of message) {
+    count += GSM7_EXTENDED.has(char) ? 2 : 1
+  }
+  return count
 }
 
 export function estimateSmsCost(message: string, recipients: number, unitCost: number): number {
   return smsPageCount(message) * recipients * unitCost
+}
+
+export function estimateWhatsAppCost(message: string, recipients: number, unitCost: number): number {
+  if (!message || recipients <= 0) return 0
+  return recipients * unitCost
 }
 
 export function parsePhoneList(raw: string): string[] {

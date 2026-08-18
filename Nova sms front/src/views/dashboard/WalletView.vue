@@ -120,9 +120,15 @@ function cancelWaiting() {
             {{ formatCurrency(wallet.formattedBalance, wallet.currency) }}
           </p>
           <p class="mt-2 text-sm text-slate-500">
-            SMS unit cost:
+            SMS price:
             <span class="font-medium text-slate-700">
-              {{ formatCurrency(wallet.smsCost, wallet.currency) }}
+              {{ formatCurrency(wallet.smsCost, wallet.currency) }} / SMS
+            </span>
+          </p>
+          <p class="mt-1 text-sm text-slate-500">
+            Available SMS:
+            <span class="font-medium text-slate-700">
+              {{ wallet.availableSms.toLocaleString('en-KE') }}
             </span>
           </p>
 

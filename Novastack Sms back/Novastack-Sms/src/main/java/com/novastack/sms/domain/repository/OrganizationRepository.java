@@ -19,6 +19,8 @@ public interface OrganizationRepository extends JpaRepository<Organization, UUID
 
     boolean existsByEmail(String email);
 
+    boolean existsByEmailIgnoreCase(String email);
+
     boolean existsByPhone(String phone);
 
     Optional<Organization> findByPhone(String phone);

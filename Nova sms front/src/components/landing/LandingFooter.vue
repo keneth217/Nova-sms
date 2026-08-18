@@ -8,6 +8,7 @@ const productLinks = [
   { to: '/#events', label: 'Event sending' },
   { to: '/register?intent=event', label: 'Get started' },
   { to: '/login', label: 'Sign in' },
+  { to: '/developers', label: 'API docs' },
 ]
 
 const resourceLinks = [

@@ -1,8 +1,13 @@
 package com.novastack.sms.service;
 
+import com.novastack.sms.config.AppProperties;
 import com.novastack.sms.domain.entity.Organization;
 import com.novastack.sms.domain.entity.User;
 import com.novastack.sms.domain.entity.WalletTransaction;
+import com.novastack.sms.domain.enums.BillingStatus;
+import com.novastack.sms.domain.enums.MessageChannel;
+import com.novastack.sms.domain.enums.OrganizationAccountType;
+import com.novastack.sms.domain.enums.OrganizationBillingModel;
 import com.novastack.sms.domain.enums.OrganizationStatus;
 import com.novastack.sms.domain.enums.SenderIdStatus;
 import com.novastack.sms.domain.enums.TopupStatus;
@@ -14,14 +19,20 @@ import com.novastack.sms.domain.repository.SmsMessageRepository;
 import com.novastack.sms.domain.repository.UserRepository;
 import com.novastack.sms.domain.repository.WalletRepository;
 import com.novastack.sms.domain.repository.WalletTransactionRepository;
+import com.novastack.sms.dto.request.AdminCreateOrganizationRequest;
+import com.novastack.sms.dto.request.AdminCreditWalletRequest;
+import com.novastack.sms.dto.request.UpdatePlatformBillingRequest;
 import com.novastack.sms.dto.response.AdminOrganizationResponse;
+import com.novastack.sms.dto.response.PlatformBillingResponse;
 import com.novastack.sms.dto.response.UserResponse;
 import com.novastack.sms.dto.response.WalletTransactionResponse;
 import com.novastack.sms.exception.ApiException;
+import com.novastack.sms.util.PhoneNormalizer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -42,6 +53,10 @@ public class AdminService {
     private final SmsMessageRepository smsMessageRepository;
     private final SenderIdRepository senderIdRepository;
     private final WalletTransactionRepository walletTransactionRepository;
+    private final WalletService walletService;
+    private final BillingSettingsService billingSettingsService;
+    private final PasswordEncoder passwordEncoder;
+    private final AppProperties appProperties;
 
     @Transactional(readOnly = true)
     public Page<AdminOrganizationResponse> listOrganizations(
@@ -65,6 +80,72 @@ public class AdminService {
                 .orElseThrow(() -> new ApiException("Organization not found", HttpStatus.NOT_FOUND));
         org.setStatus(status);
         return toOrgResponse(organizationRepository.save(org));
+    }
+
+    @Transactional
+    public AdminOrganizationResponse createOrganization(AdminCreateOrganizationRequest request) {
+        String phone = PhoneNormalizer.normalize(request.getPhone());
+        String email = request.getEmail().trim();
+        if (organizationRepository.existsByEmailIgnoreCase(email) || userRepository.existsByEmailIgnoreCase(email)) {
+            throw new ApiException("Email already registered", HttpStatus.CONFLICT);
+        }
+        if (organizationRepository.existsByPhone(phone)) {
+            throw new ApiException("Phone number already registered", HttpStatus.CONFLICT);
+        }
+        OrganizationAccountType accountType = request.getAccountType() != null
+                ? request.getAccountType()
+                : OrganizationAccountType.BUSINESS;
+        OrganizationBillingModel billingModel = request.getBillingModel() != null
+                ? request.getBillingModel()
+                : OrganizationBillingModel.PREPAID;
+        Organization organization = Organization.builder()
+                .name(request.getName().trim())
+                .email(email)
+                .phone(phone)
+                .apiKey(generateLegacyApiKey())
+                .status(OrganizationStatus.ACTIVE)
+                .accountType(accountType)
+                .billingModel(billingModel)
+                .smsCost(request.getSmsCost() != null ? request.getSmsCost() : billingSettingsService.customerPrice())
+                .build();
+        organization = organizationRepository.save(organization);
+        String compact = organization.getId().toString().replace("-", "");
+        organization.setMpesaAccountRef(("NOVA" + compact.substring(0, Math.min(8, compact.length()))).toUpperCase());
+        organization = organizationRepository.save(organization);
+        walletService.createForOrganization(organization);
+
+        if (request.getAdminFullName() != null && !request.getAdminFullName().isBlank()
+                && request.getAdminPassword() != null && !request.getAdminPassword().isBlank()) {
+            userRepository.save(User.builder()
+                    .email(email)
+                    .password(passwordEncoder.encode(request.getAdminPassword()))
+                    .fullName(request.getAdminFullName().trim())
+                    .role(UserRole.ORGANIZATION_ADMIN)
+                    .organization(organization)
+                    .enabled(true)
+                    .build());
+        }
+
+        if (request.getInitialCredit() != null && request.getInitialCredit().compareTo(BigDecimal.ZERO) > 0) {
+            walletService.adjust(
+                    organization.getId(),
+                    request.getInitialCredit(),
+                    "ADJ-" + UUID.randomUUID(),
+                    "Opening credit");
+        }
+        return toOrgResponse(organization);
+    }
+
+    @Transactional
+    public AdminOrganizationResponse creditWallet(UUID organizationId, AdminCreditWalletRequest request) {
+        if (!organizationRepository.existsById(organizationId)) {
+            throw new ApiException("Organization not found", HttpStatus.NOT_FOUND);
+        }
+        String description = request.getDescription() == null || request.getDescription().isBlank()
+                ? "Admin wallet credit"
+                : request.getDescription().trim();
+        walletService.adjust(organizationId, request.getAmount(), "ADJ-" + UUID.randomUUID(), description);
+        return getOrganization(organizationId);
     }
 
     @Transactional(readOnly = true)
@@ -112,6 +193,49 @@ public class AdminService {
     }
 
     @Transactional(readOnly = true)
+    public PlatformBillingResponse platformBilling() {
+        BigDecimal customerPrice = billingSettingsService.customerPrice();
+        BigDecimal providerCost = billingSettingsService.providerCostPerSms();
+        BigDecimal grossMargin = customerPrice.subtract(providerCost).setScale(2, java.math.RoundingMode.HALF_UP);
+        long totalSmsSent = smsMessageRepository.countByChannelAndBillingStatus(
+                MessageChannel.SMS, BillingStatus.CHARGED);
+        long totalSmsUnits = smsMessageRepository.sumUnitsByChannelAndBillingStatus(
+                MessageChannel.SMS, BillingStatus.CHARGED);
+        BigDecimal revenue = nullToZero(smsMessageRepository.sumCustomerRevenueByChannelAndBillingStatus(
+                MessageChannel.SMS, BillingStatus.CHARGED));
+        BigDecimal estimatedProviderCost = nullToZero(smsMessageRepository.sumProviderCostByChannelAndBillingStatus(
+                MessageChannel.SMS, BillingStatus.CHARGED));
+        BigDecimal totalMargin = nullToZero(smsMessageRepository.sumGrossMarginByChannelAndBillingStatus(
+                MessageChannel.SMS, BillingStatus.CHARGED));
+        return PlatformBillingResponse.builder()
+                .provider(com.novastack.sms.provider.TalkSasaSmsProvider.PROVIDER_NAME)
+                .defaultSenderId(appProperties.getSms().getTalksasa().resolvedDefaultSenderId())
+                .customerSmsPrice(customerPrice)
+                .providerCost(providerCost)
+                .grossMargin(grossMargin)
+                .currency(billingSettingsService.currency())
+                .totalSmsSent(totalSmsSent)
+                .totalSmsUnits(totalSmsUnits)
+                .totalCustomerRevenue(revenue)
+                .totalEstimatedProviderCost(estimatedProviderCost)
+                .totalGrossMargin(totalMargin)
+                .build();
+    }
+
+    @Transactional
+    public PlatformBillingResponse updatePlatformBilling(UpdatePlatformBillingRequest request) {
+        billingSettingsService.update(
+                request.getCustomerSmsPrice(),
+                request.getProviderCost(),
+                request.getCurrency());
+        return platformBilling();
+    }
+
+    private static BigDecimal nullToZero(BigDecimal value) {
+        return value == null ? BigDecimal.ZERO : value;
+    }
+
+    @Transactional(readOnly = true)
     public UserResponse getUser(UUID userId) {
         User user = userRepository.findByIdWithOrganization(userId)
                 .orElseThrow(() -> new ApiException("User not found", HttpStatus.NOT_FOUND));
@@ -136,12 +260,12 @@ public class AdminService {
                 .name(org.getName())
                 .email(org.getEmail())
                 .phone(org.getPhone())
-                .apiKey(org.getApiKey())
                 .mpesaAccountRef(org.getMpesaAccountRef())
                 .status(org.getStatus())
                 .accountType(org.getAccountType())
+                .billingModel(org.getBillingModel())
                 .expiresAt(org.getExpiresAt())
-                .smsCost(org.getSmsCost())
+                .smsCost(billingSettingsService.customerPrice())
                 .walletBalance(wallet.map(w -> w.getBalance()).orElse(BigDecimal.ZERO))
                 .currency(wallet.map(w -> w.getCurrency()).orElse("KES"))
                 .userCount(userRepository.countByOrganizationId(org.getId()))
@@ -184,5 +308,10 @@ public class AdminService {
 
     private String blankToNull(String value) {
         return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    private String generateLegacyApiKey() {
+        return "nsk_" + UUID.randomUUID().toString().replace("-", "")
+                + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
     }
 }

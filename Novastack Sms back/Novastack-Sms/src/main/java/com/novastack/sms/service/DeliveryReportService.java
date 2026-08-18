@@ -116,7 +116,7 @@ public class DeliveryReportService {
         if (message.getStatus() == MessageStatus.DELIVERED && mapped != MessageStatus.DELIVERED) {
             return;
         }
-        if (message.getStatus() == MessageStatus.FAILED && mapped == MessageStatus.PENDING) {
+        if (message.getStatus().isBillableFailure() && mapped.isInFlight()) {
             return;
         }
 
@@ -124,7 +124,7 @@ public class DeliveryReportService {
         if (mapped == MessageStatus.DELIVERED) {
             message.setDeliveredAt(Instant.now());
             message.setFailureReason(null);
-        } else if (mapped == MessageStatus.FAILED) {
+        } else if (mapped.isBillableFailure()) {
             message.setFailureReason(buildFailureDetail(statusText, failureReason));
         }
     }
@@ -141,18 +141,25 @@ public class DeliveryReportService {
 
         return switch (statusText.trim().toLowerCase(Locale.ROOT)) {
             case "success" -> MessageStatus.DELIVERED;
-            case "failed", "rejected", "absentsubscriber", "expired" -> MessageStatus.FAILED;
-            case "sent", "submitted", "buffered" -> MessageStatus.PENDING;
+            case "failed", "absentsubscriber", "expired" -> MessageStatus.FAILED;
+            case "rejected" -> MessageStatus.REJECTED;
+            case "sent" -> MessageStatus.SENT;
+            case "submitted", "buffered" -> MessageStatus.ACCEPTED;
             default -> {
                 String normalized = statusText.trim().toLowerCase(Locale.ROOT);
                 if (normalized.contains("success") || normalized.contains("deliver")) {
                     yield MessageStatus.DELIVERED;
                 }
+                if (normalized.contains("reject")) {
+                    yield MessageStatus.REJECTED;
+                }
                 if (normalized.contains("fail")
-                        || normalized.contains("reject")
                         || normalized.contains("absent")
                         || normalized.contains("expir")) {
                     yield MessageStatus.FAILED;
+                }
+                if (normalized.contains("sent")) {
+                    yield MessageStatus.SENT;
                 }
                 yield MessageStatus.PENDING;
             }

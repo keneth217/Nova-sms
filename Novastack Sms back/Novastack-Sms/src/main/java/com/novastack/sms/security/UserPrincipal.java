@@ -1,6 +1,8 @@
 package com.novastack.sms.security;
 
+import com.novastack.sms.domain.entity.ApiClient;
 import com.novastack.sms.domain.entity.User;
+import com.novastack.sms.domain.enums.ApiPermission;
 import com.novastack.sms.domain.enums.UserRole;
 import lombok.Getter;
 import org.springframework.security.core.GrantedAuthority;
@@ -8,7 +10,9 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
 import java.util.Collection;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Getter
@@ -22,11 +26,24 @@ public class UserPrincipal implements UserDetails {
     private final UUID organizationId;
     private final boolean enabled;
     private final long tokenVersion;
-    private final String apiKey;
+    private final String apiKeyPrefix;
     private final boolean apiKeyAuth;
+    private final UUID apiClientId;
+    private final Set<ApiPermission> apiPermissions;
 
-    private UserPrincipal(UUID id, String email, String password, String fullName, UserRole role,
-                          UUID organizationId, boolean enabled, long tokenVersion, String apiKey, boolean apiKeyAuth) {
+    private UserPrincipal(
+            UUID id,
+            String email,
+            String password,
+            String fullName,
+            UserRole role,
+            UUID organizationId,
+            boolean enabled,
+            long tokenVersion,
+            String apiKeyPrefix,
+            boolean apiKeyAuth,
+            UUID apiClientId,
+            Set<ApiPermission> apiPermissions) {
         this.id = id;
         this.email = email;
         this.password = password;
@@ -35,8 +52,10 @@ public class UserPrincipal implements UserDetails {
         this.organizationId = organizationId;
         this.enabled = enabled;
         this.tokenVersion = tokenVersion;
-        this.apiKey = apiKey;
+        this.apiKeyPrefix = apiKeyPrefix;
         this.apiKeyAuth = apiKeyAuth;
+        this.apiClientId = apiClientId;
+        this.apiPermissions = apiPermissions == null ? Set.of() : Set.copyOf(apiPermissions);
     }
 
     public static UserPrincipal fromUser(User user) {
@@ -50,11 +69,13 @@ public class UserPrincipal implements UserDetails {
                 user.isEnabled(),
                 user.getTokenVersion(),
                 null,
-                false
+                false,
+                null,
+                Set.of()
         );
     }
 
-    public static UserPrincipal fromApiKey(UUID organizationId, String apiKey, String orgName) {
+    public static UserPrincipal fromLegacyApiKey(UUID organizationId, String orgName) {
         return new UserPrincipal(
                 null,
                 orgName + "@api",
@@ -64,9 +85,48 @@ public class UserPrincipal implements UserDetails {
                 organizationId,
                 true,
                 0L,
-                apiKey,
-                true
+                null,
+                true,
+                null,
+                Set.of()
         );
+    }
+
+    public static UserPrincipal fromApiKey(UUID organizationId, String apiKey, String orgName) {
+        return fromLegacyApiKey(organizationId, orgName);
+    }
+
+    public static UserPrincipal fromApiClient(ApiClient client) {
+        UUID orgId = client.getOrganization() != null ? client.getOrganization().getId() : null;
+        String orgName = client.getOrganization() != null ? client.getOrganization().getName() : client.getName();
+        Set<ApiPermission> permissions = client.getPermissions() == null || client.getPermissions().isEmpty()
+                ? EnumSet.noneOf(ApiPermission.class)
+                : EnumSet.copyOf(client.getPermissions());
+        return new UserPrincipal(
+                null,
+                client.getClientCode() + "@api",
+                "",
+                client.getName(),
+                UserRole.ORGANIZATION_ADMIN,
+                orgId,
+                true,
+                0L,
+                client.getApiKeyPrefix(),
+                true,
+                client.getId(),
+                permissions
+        );
+    }
+
+    public boolean isScopedApiClient() {
+        return apiClientId != null;
+    }
+
+    public boolean hasPermission(ApiPermission permission) {
+        if (!isScopedApiClient()) {
+            return true;
+        }
+        return apiPermissions.contains(permission);
     }
 
     @Override

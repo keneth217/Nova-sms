@@ -2,7 +2,10 @@ package com.novastack.sms.service;
 
 import com.novastack.sms.domain.entity.Contact;
 import com.novastack.sms.domain.entity.ContactGroup;
+import com.novastack.sms.domain.entity.ContactProviderUid;
+import com.novastack.sms.domain.entity.Organization;
 import com.novastack.sms.domain.repository.ContactGroupRepository;
+import com.novastack.sms.domain.repository.ContactProviderUidRepository;
 import com.novastack.sms.domain.repository.ContactRepository;
 import com.novastack.sms.domain.repository.OrganizationRepository;
 import com.novastack.sms.dto.request.AddContactsToGroupRequest;
@@ -12,7 +15,10 @@ import com.novastack.sms.dto.request.ContactRequest;
 import com.novastack.sms.dto.response.ContactGroupResponse;
 import com.novastack.sms.dto.response.ContactResponse;
 import com.novastack.sms.exception.ApiException;
+import com.novastack.sms.provider.TalkSasaContactClient;
+import com.novastack.sms.provider.TalkSasaContactGroupClient;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.DataFormatter;
 import org.apache.poi.ss.usermodel.Row;
@@ -38,11 +44,15 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class ContactService {
 
     private final ContactRepository contactRepository;
     private final ContactGroupRepository contactGroupRepository;
+    private final ContactProviderUidRepository contactProviderUidRepository;
     private final OrganizationRepository organizationRepository;
+    private final TalkSasaContactGroupClient talkSasaContactGroupClient;
+    private final TalkSasaContactClient talkSasaContactClient;
     private final DataFormatter dataFormatter = new DataFormatter();
 
     @Transactional
@@ -54,12 +64,50 @@ public class ContactService {
         if (contactGroupRepository.existsByOrganizationIdAndNameIgnoreCase(organizationId, name)) {
             throw new ApiException("Group name already exists", HttpStatus.CONFLICT);
         }
+        Organization org = organizationRepository.findById(organizationId)
+                .orElseThrow(() -> new ApiException("Organization not found", HttpStatus.NOT_FOUND));
         ContactGroup group = contactGroupRepository.save(ContactGroup.builder()
-                .organization(organizationRepository.getReferenceById(organizationId))
+                .organization(org)
                 .name(name)
                 .description(blankToNull(request.getDescription()))
                 .build());
+        syncCreate(org, group);
         return toGroupResponse(group, 0);
+    }
+
+    @Transactional
+    public ContactGroupResponse updateGroup(UUID organizationId, UUID groupId, ContactGroupRequest request) {
+        String name = request.getName() == null ? "" : request.getName().trim();
+        if (name.isEmpty()) {
+            throw new ApiException("Group name is required", HttpStatus.BAD_REQUEST);
+        }
+        ContactGroup group = requireGroup(organizationId, groupId);
+        if (contactGroupRepository.existsByOrganizationIdAndNameIgnoreCaseAndIdNot(organizationId, name, groupId)) {
+            throw new ApiException("Group name already exists", HttpStatus.CONFLICT);
+        }
+        group.setName(name);
+        if (request.getDescription() != null) {
+            group.setDescription(blankToNull(request.getDescription()));
+        }
+        contactGroupRepository.save(group);
+        syncUpdate(group);
+        return toGroupResponse(
+                group,
+                contactRepository.countByOrganizationIdAndGroupsId(organizationId, groupId));
+    }
+
+    @Transactional
+    public void deleteGroup(UUID organizationId, UUID groupId) {
+        ContactGroup group = requireGroup(organizationId, groupId);
+        String providerUid = group.getProviderGroupUid();
+        List<Contact> members = contactRepository.findByOrganizationIdAndGroupsId(organizationId, groupId);
+        for (Contact contact : members) {
+            contact.getGroups().remove(group);
+            contactRepository.save(contact);
+        }
+        contactProviderUidRepository.deleteByGroupId(groupId);
+        contactGroupRepository.delete(group);
+        syncDelete(providerUid);
     }
 
     @Transactional(readOnly = true)
@@ -94,11 +142,54 @@ public class ContactService {
                 .email(request.getEmail())
                 .build();
 
-        if (request.getGroupId() != null) {
-            contact.getGroups().add(requireGroup(organizationId, request.getGroupId()));
+        ContactGroup group = request.getGroupId() != null
+                ? requireGroup(organizationId, request.getGroupId())
+                : null;
+        if (group != null) {
+            contact.getGroups().add(group);
         }
 
-        return toContactResponse(contactRepository.save(contact));
+        Contact saved = contactRepository.save(contact);
+        if (group != null) {
+            syncStore(saved, group);
+        }
+        return toContactResponse(saved);
+    }
+
+    @Transactional
+    public ContactResponse updateContact(UUID organizationId, UUID contactId, ContactRequest request) {
+        Contact contact = contactRepository.findByIdAndOrganizationIdWithGroups(contactId, organizationId)
+                .orElseThrow(() -> new ApiException("Contact not found", HttpStatus.NOT_FOUND));
+        String phone = normalize(request.getPhone());
+        if (contactRepository.existsByOrganizationIdAndPhoneAndIdNot(organizationId, phone, contactId)) {
+            throw new ApiException("Contact already exists", HttpStatus.CONFLICT);
+        }
+        contact.setPhone(phone);
+        contact.setFirstName(blankToNull(request.getFirstName()));
+        contact.setLastName(blankToNull(request.getLastName()));
+        if (request.getEmail() != null) {
+            contact.setEmail(blankToNull(request.getEmail()));
+        }
+        Contact saved = contactRepository.save(contact);
+        syncUpdateContact(saved);
+        return toContactResponse(saved);
+    }
+
+    @Transactional
+    public void deleteContact(UUID organizationId, UUID contactId) {
+        Contact contact = contactRepository.findByIdAndOrganizationIdWithGroups(contactId, organizationId)
+                .orElseThrow(() -> new ApiException("Contact not found", HttpStatus.NOT_FOUND));
+        List<ContactProviderUid> mappings = contactProviderUidRepository.findByContactId(contact.getId());
+        for (ContactProviderUid mapping : mappings) {
+            ContactGroup group = contact.getGroups().stream()
+                    .filter(item -> item.getId().equals(mapping.getGroupId()))
+                    .findFirst()
+                    .orElse(null);
+            String groupUid = group != null ? group.getProviderGroupUid() : null;
+            syncDeleteMember(groupUid, mapping.getProviderContactUid());
+        }
+        contact.getGroups().clear();
+        contactRepository.delete(contact);
     }
 
     @Transactional
@@ -251,10 +342,15 @@ public class ContactService {
 
         int added = 0;
         for (Contact contact : contacts) {
-            if (contact.getGroups().add(group)) {
+            boolean newlyAdded = contact.getGroups().add(group);
+            if (newlyAdded) {
                 added++;
             }
             contactRepository.save(contact);
+            if (newlyAdded
+                    || contactProviderUidRepository.findByContactIdAndGroupId(contact.getId(), group.getId()).isEmpty()) {
+                syncStore(contact, group);
+            }
         }
 
         Map<String, Object> result = new HashMap<>();
@@ -273,6 +369,7 @@ public class ContactService {
             throw new ApiException("Contact is not in this group", HttpStatus.BAD_REQUEST);
         }
         contactRepository.save(contact);
+        syncDeleteMembership(contact.getId(), group);
     }
 
     @Transactional(readOnly = true)
@@ -303,6 +400,7 @@ public class ContactService {
             Contact contact = existing.get();
             if (group != null && contact.getGroups().add(group)) {
                 contactRepository.save(contact);
+                syncStore(contact, group);
                 return ImportOutcome.UPDATED;
             }
             return ImportOutcome.SKIPPED;
@@ -318,13 +416,191 @@ public class ContactService {
         if (group != null) {
             contact.getGroups().add(group);
         }
-        contactRepository.save(contact);
+        Contact saved = contactRepository.save(contact);
+        if (group != null) {
+            syncStore(saved, group);
+        }
         return ImportOutcome.CREATED;
     }
 
     private ContactGroup requireGroup(UUID organizationId, UUID groupId) {
         return contactGroupRepository.findByIdAndOrganizationId(groupId, organizationId)
                 .orElseThrow(() -> new ApiException("Group not found", HttpStatus.NOT_FOUND));
+    }
+
+    private void syncCreate(Organization org, ContactGroup group) {
+        try {
+            if (!talkSasaContactGroupClient.isEnabled()) {
+                return;
+            }
+            talkSasaContactGroupClient.create(providerGroupName(org, group.getName()))
+                    .ifPresentOrElse(
+                            remote -> {
+                                group.setProviderGroupUid(remote.uid());
+                                contactGroupRepository.save(group);
+                                log.info("Synced contact group {} to TalkSasa uidSuffix={}",
+                                        group.getId(), suffix(remote.uid()));
+                            },
+                            () -> log.warn("TalkSasa contact group create did not return a uid for {}", group.getId()));
+        } catch (Exception ex) {
+            log.warn("TalkSasa contact group create sync failed for {}: {}", group.getId(), ex.getMessage());
+        }
+    }
+
+    private void syncUpdate(ContactGroup group) {
+        try {
+            if (!talkSasaContactGroupClient.isEnabled()) {
+                return;
+            }
+            String remoteName = providerGroupName(group.getOrganization(), group.getName());
+            if (group.getProviderGroupUid() == null || group.getProviderGroupUid().isBlank()) {
+                syncCreate(group.getOrganization(), group);
+                return;
+            }
+            talkSasaContactGroupClient.update(group.getProviderGroupUid(), remoteName)
+                    .ifPresentOrElse(
+                            remote -> {
+                                if (remote.uid() != null && !remote.uid().equals(group.getProviderGroupUid())) {
+                                    group.setProviderGroupUid(remote.uid());
+                                    contactGroupRepository.save(group);
+                                }
+                            },
+                            () -> log.warn("TalkSasa contact group update failed for {}", group.getId()));
+        } catch (Exception ex) {
+            log.warn("TalkSasa contact group update sync failed for {}: {}", group.getId(), ex.getMessage());
+        }
+    }
+
+    private void syncDelete(String providerUid) {
+        try {
+            if (providerUid == null || providerUid.isBlank() || !talkSasaContactGroupClient.isEnabled()) {
+                return;
+            }
+            if (!talkSasaContactGroupClient.delete(providerUid)) {
+                log.warn("TalkSasa contact group delete failed uidSuffix={}", suffix(providerUid));
+            }
+        } catch (Exception ex) {
+            log.warn("TalkSasa contact group delete sync failed uidSuffix={}: {}", suffix(providerUid), ex.getMessage());
+        }
+    }
+
+    private void syncStore(Contact contact, ContactGroup group) {
+        try {
+            if (!talkSasaContactClient.isEnabled() || contact == null || group == null) {
+                return;
+            }
+            if (contactProviderUidRepository.findByContactIdAndGroupId(contact.getId(), group.getId()).isPresent()) {
+                return;
+            }
+            ensureProviderGroup(group);
+            String groupUid = group.getProviderGroupUid();
+            if (groupUid == null || groupUid.isBlank()) {
+                return;
+            }
+            talkSasaContactClient.store(groupUid, contact.getPhone(), contact.getFirstName(), contact.getLastName())
+                    .ifPresentOrElse(
+                            remote -> {
+                                contactProviderUidRepository.save(ContactProviderUid.builder()
+                                        .contactId(contact.getId())
+                                        .groupId(group.getId())
+                                        .providerContactUid(remote.uid())
+                                        .build());
+                                log.info("Synced contact {} to TalkSasa group uidSuffix={} contactUidSuffix={}",
+                                        contact.getId(), suffix(groupUid), suffix(remote.uid()));
+                            },
+                            () -> log.warn("TalkSasa contact store did not return a uid for {} in group {}",
+                                    contact.getId(), group.getId()));
+        } catch (Exception ex) {
+            log.warn("TalkSasa contact store sync failed for {}: {}", contact.getId(), ex.getMessage());
+        }
+    }
+
+    private void syncUpdateContact(Contact contact) {
+        try {
+            if (!talkSasaContactClient.isEnabled() || contact == null) {
+                return;
+            }
+            for (ContactGroup group : contact.getGroups()) {
+                var mapping = contactProviderUidRepository.findByContactIdAndGroupId(contact.getId(), group.getId());
+                if (mapping.isEmpty()) {
+                    syncStore(contact, group);
+                    continue;
+                }
+                ensureProviderGroup(group);
+                String groupUid = group.getProviderGroupUid();
+                if (groupUid == null || groupUid.isBlank()) {
+                    continue;
+                }
+                talkSasaContactClient.update(
+                                groupUid,
+                                mapping.get().getProviderContactUid(),
+                                contact.getPhone(),
+                                contact.getFirstName(),
+                                contact.getLastName())
+                        .ifPresentOrElse(
+                                remote -> {
+                                    if (remote.uid() != null
+                                            && !remote.uid().equals(mapping.get().getProviderContactUid())) {
+                                        mapping.get().setProviderContactUid(remote.uid());
+                                        contactProviderUidRepository.save(mapping.get());
+                                    }
+                                },
+                                () -> log.warn("TalkSasa contact update failed for {} in group {}",
+                                        contact.getId(), group.getId()));
+            }
+        } catch (Exception ex) {
+            log.warn("TalkSasa contact update sync failed for {}: {}", contact.getId(), ex.getMessage());
+        }
+    }
+
+    private void syncDeleteMembership(UUID contactId, ContactGroup group) {
+        try {
+            var mapping = contactProviderUidRepository.findByContactIdAndGroupId(contactId, group.getId());
+            if (mapping.isEmpty()) {
+                return;
+            }
+            syncDeleteMember(group.getProviderGroupUid(), mapping.get().getProviderContactUid());
+            contactProviderUidRepository.deleteByContactIdAndGroupId(contactId, group.getId());
+        } catch (Exception ex) {
+            log.warn("TalkSasa contact membership delete sync failed for {}: {}", contactId, ex.getMessage());
+        }
+    }
+
+    private void syncDeleteMember(String groupUid, String contactUid) {
+        try {
+            if (groupUid == null || groupUid.isBlank() || contactUid == null || contactUid.isBlank()
+                    || !talkSasaContactClient.isEnabled()) {
+                return;
+            }
+            if (!talkSasaContactClient.delete(groupUid, contactUid)) {
+                log.warn("TalkSasa contact delete failed groupUidSuffix={} contactUidSuffix={}",
+                        suffix(groupUid), suffix(contactUid));
+            }
+        } catch (Exception ex) {
+            log.warn("TalkSasa contact delete sync failed contactUidSuffix={}: {}", suffix(contactUid), ex.getMessage());
+        }
+    }
+
+    private void ensureProviderGroup(ContactGroup group) {
+        if (group.getProviderGroupUid() != null && !group.getProviderGroupUid().isBlank()) {
+            return;
+        }
+        syncCreate(group.getOrganization(), group);
+    }
+
+    private String providerGroupName(Organization org, String groupName) {
+        String orgName = org != null && org.getName() != null && !org.getName().isBlank()
+                ? org.getName().trim()
+                : "Nova";
+        String combined = orgName + " - " + groupName;
+        return combined.length() <= 100 ? combined : combined.substring(0, 100);
+    }
+
+    private static String suffix(String value) {
+        if (value == null || value.length() < 6) {
+            return value;
+        }
+        return "..." + value.substring(value.length() - 6);
     }
 
     private Map<String, Integer> mapHeaderColumns(Row header) {

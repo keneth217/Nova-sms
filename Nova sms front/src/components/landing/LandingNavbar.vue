@@ -78,6 +78,13 @@ function goEvents() {
           Features
         </RouterLink>
         <RouterLink
+          to="/developers"
+          class="text-sm font-medium text-slate-600 transition hover:text-slate-900"
+          active-class="!text-slate-900"
+        >
+          Developers
+        </RouterLink>
+        <RouterLink
           to="/data-bundles"
           class="text-sm font-medium text-slate-600 transition hover:text-slate-900"
           active-class="!text-slate-900"
@@ -153,6 +160,13 @@ function goEvents() {
           @click="goFeatures"
         >
           Features
+        </RouterLink>
+        <RouterLink
+          to="/developers"
+          class="text-sm font-medium text-slate-600"
+          @click="open = false"
+        >
+          Developers
         </RouterLink>
         <RouterLink
           to="/data-bundles"

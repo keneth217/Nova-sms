@@ -1,6 +1,6 @@
 # Novastack SMS Gateway
 
-Multi-tenant **Bulk SMS Gateway** built with Spring Boot 3, Java 21, MySQL, Spring Security (JWT + API Key), Spring Data JPA, and Africa's Talking.
+Multi-tenant **Bulk SMS Gateway** built with Spring Boot 3, Java 21, MySQL, Spring Security (JWT + API Key), Spring Data JPA, and TalkSasa (default SMS provider).
 
 ## Features
 
@@ -8,12 +8,15 @@ Multi-tenant **Bulk SMS Gateway** built with Spring Boot 3, Java 21, MySQL, Spri
 - SMS wallet with M-Pesa Paybill top-up and transaction history
 - Shared platform sender ID + organization-specific sender IDs (pending / approved / rejected)
 - Single, bulk, and scheduled SMS delivery
-- Africa's Talking provider abstraction with retries and request/response logging
-- Delivery report (DLR) callbacks
-- Contact groups, contacts, and bulk import
+- Pluggable SMS providers (`TalkSasaSmsProvider` default, `AfricasTalkingSmsProvider` optional)
+- WhatsApp via TalkSasa (`type=whatsapp` on the same send API)
+- SMS unit (segment) calculation and wallet billing by units
+- TalkSasa status lookup and scheduled status sync
+- Delivery report (DLR) callbacks (Africa's Talking)
+- Contact groups, contacts, and bulk import (TalkSasa group mirror is best-effort)
 - JWT dashboard auth + API key org access
 - Roles: `SUPER_ADMIN`, `ORGANIZATION_ADMIN`
-- Dashboard reporting (volume, delivery rate, wallet usage, cost)
+- Dashboard reporting (volume, delivery rate, wallet usage, cost, SMS units)
 
 ## Tech Stack
 
@@ -23,7 +26,7 @@ Multi-tenant **Bulk SMS Gateway** built with Spring Boot 3, Java 21, MySQL, Spri
 | Framework | Spring Boot 3.4 |
 | Security | Spring Security, JWT (JJWT), API Key header |
 | Persistence | Spring Data JPA, Flyway, MySQL 8 |
-| SMS Provider | Africa's Talking (pluggable `SmsProvider`) |
+| SMS Provider | TalkSasa (default) via pluggable `SmsProvider` |
 | Docs | springdoc-openapi (Swagger UI) |
 
 ## Project Structure
@@ -38,7 +41,7 @@ src/main/java/com/novastack/sms/
 │   └── repository/  # Spring Data repositories
 ├── dto/             # Request/response DTOs
 ├── exception/       # Global exception handling
-├── provider/        # SMS provider abstraction (Africa's Talking)
+├── provider/        # SMS provider abstraction (TalkSasa default, Africa's Talking optional)
 ├── scheduler/       # Scheduled SMS dispatcher
 ├── security/        # JWT + API key filters
 └── service/         # Business logic
@@ -59,7 +62,30 @@ src/main/resources/
 
 Create a database (or let the JDBC URL create it) and set credentials in `src/main/resources/application.yaml`.
 
-### 2. Configure Africa's Talking
+### 2. Configure TalkSasa (default SMS provider)
+
+Copy `.env.example` and set:
+
+```bash
+export SMS_PROVIDER=talksasa
+export TALKSASA_API_TOKEN=your-talksasa-token
+export TALKSASA_SENDER_ID=TALK-SASA
+export TALKSASA_BASE_URL=https://bulksms.talksasa.com/api/v3
+```
+
+Never commit a real token. The frontend must never receive `TALKSASA_API_TOKEN`.
+
+Contact groups and members stay in Nova. When `TALKSASA_SYNC_CONTACT_GROUPS=true` (default) and a token is set, create/rename/delete of groups mirrors TalkSasa `POST/PATCH/DELETE /contacts`. Adding, updating, or removing a grouped contact mirrors TalkSasa `POST /contacts/{group_id}/store`, `PATCH /contacts/{group_id}/update/{uid}`, and `DELETE /contacts/{group_id}/delete/{uid}`. Contacts without a Nova group are not sent to TalkSasa (store requires a group uid). Names are prefixed with the organization name so tenants on one TalkSasa account do not collide. TalkSasa downtime does not fail Nova contact operations. SMS is still sent from Nova recipient lists, not TalkSasa campaigns.
+
+To switch providers without a code change:
+
+```bash
+export SMS_PROVIDER=africastalking
+export AT_USERNAME=sandbox
+export AT_API_KEY=your-africas-talking-api-key
+```
+
+### 2b. Configure Africa's Talking (optional fallback)
 
 ```bash
 export AT_USERNAME=sandbox
@@ -123,6 +149,12 @@ X-API-Key: nsk_...
 | `POST` | `/api/v1/sms/bulk` | Send bulk SMS |
 | `POST` | `/api/v1/sms/schedule` | Schedule SMS |
 | `GET` | `/api/v1/sms/history` | SMS history |
+| `POST` | `/api/v1/whatsapp/send` | Send a WhatsApp message |
+| `POST` | `/api/v1/whatsapp/bulk` | Send bulk WhatsApp |
+| `POST` | `/api/v1/whatsapp/schedule` | Schedule WhatsApp |
+| `GET` | `/api/v1/whatsapp/history` | WhatsApp history |
+| `GET` | `/api/v1/admin/overview` | Platform overview counts |
+| `GET` | `/api/v1/admin/talksasa` | TalkSasa profile and SMS unit balance |
 | `GET` | `/api/v1/reports/dashboard` | Dashboard metrics |
 | `POST` | `/api/v1/dlr/callback` | Delivery report callback |
 
@@ -132,6 +164,23 @@ Additional endpoints:
 - `/api/v1/contacts/import/excel` (Excel upload), `/api/v1/contacts/import/excel/template`
 - `/api/v1/sender-ids` (+ `PATCH /api/v1/sender-ids/{id}/review` for `SUPER_ADMIN`)
 - `/api/v1/wallet/transactions`
+- `/api/v1/api-clients` (create/rotate/revoke hashed `nova_live_` keys)
+- `/api/v1/admin/api-clients`, `POST /api/v1/admin/organizations`, `POST /api/v1/admin/organizations/{id}/wallet/credit`
+
+### Developer API (internal applications)
+
+SaaS customers keep using JWT in the web app. Internal apps (Mwalimu, Chamaplus, Nova POS) send SMS with:
+
+```http
+POST /api/v1/sms/send
+X-API-Key: nova_live_xxxxxxxxx
+Idempotency-Key: payment-123456
+Content-Type: application/json
+
+{ "recipient": "254712345678", "message": "Your payment has been received." }
+```
+
+Keys are hashed at rest (`api_clients`). Permissions: `SMS_SEND`, `SMS_BULK`, `SMS_STATUS`, `SMS_HISTORY`. Per-client rate limits return HTTP 429. Both dashboard and API clients call the same `SmsService` and organization wallet. TalkSasa credentials never leave the backend.
 
 ### Contacts, groups & Excel import
 
@@ -146,6 +195,22 @@ Content-Type: application/json
 
 { "name": "Customers", "description": "Active customers" }
 ```
+
+Rename or delete a group (tenant-scoped; TalkSasa is mirrored when a provider UID exists):
+
+```http
+PATCH /api/v1/contacts/groups/{groupId}
+DELETE /api/v1/contacts/groups/{groupId}
+```
+
+Update or delete a contact (TalkSasa members are mirrored for each grouped membership):
+
+```http
+PATCH /api/v1/contacts/{contactId}
+DELETE /api/v1/contacts/{contactId}
+```
+
+The API never returns TalkSasa UIDs or tokens. Ungrouped contacts stay on Nova only.
 
 2. **Download Excel template**
 
@@ -279,9 +344,81 @@ Content-Type: application/json
 }
 ```
 
-Messages are saved as `QUEUED`, then delivered immediately via Africa's Talking (with retries on failure). Status transitions: `QUEUED` → `SENT` → `DELIVERED` / `FAILED`.
+Messages are stored as `PENDING`, submitted to TalkSasa (or the configured provider), then updated to `ACCEPTED` / `SENT` / `DELIVERED` / `FAILED`. Status transitions: `PENDING` → `ACCEPTED` → `SENT` → `DELIVERED` / `FAILED`.
 
-### Configure DLR callback
+### Check a message by Nova SMS id
+
+```http
+GET /api/v1/sms/{id}
+Authorization: Bearer <token>
+```
+
+Refresh provider status (TalkSasa `GET /sms/{uid}` is called internally; clients never use the TalkSasa UID):
+
+```http
+GET /api/v1/sms/{id}/status
+Authorization: Bearer <token>
+```
+
+### WhatsApp (TalkSasa)
+
+WhatsApp uses the same TalkSasa `POST /sms/send` endpoint with `"type":"whatsapp"`. Nova remains the source of truth: wallet, sender IDs, contacts, history, and scheduling stay on Nova. TalkSasa `schedule_time` is not used.
+
+```http
+POST /api/v1/whatsapp/send
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{ "recipient": "0712345678", "message": "Hello on WhatsApp" }
+```
+
+Also: `POST /api/v1/whatsapp/bulk`, `POST /api/v1/whatsapp/schedule`, `GET /api/v1/whatsapp/history`, `GET /api/v1/whatsapp/{id}`, `GET /api/v1/whatsapp/{id}/status`.
+
+WhatsApp is always sent through TalkSasa, even if `SMS_PROVIDER=africastalking`. Each WhatsApp message is billed as 1 unit (not GSM segments). Recipients must be able to receive WhatsApp on TalkSasa. The frontend never receives `TALKSASA_API_TOKEN`.
+
+Optional platform WhatsApp unit price (otherwise org `sms_cost` / SMS unit price):
+
+```bash
+export NOVASTACK_SMS_PRICING_WHATSAPP_PRICE_PER_UNIT=1.00
+```
+
+### TalkSasa profile and SMS units
+
+Super admins can inspect the **platform** TalkSasa account (one token). This is not an organization wallet.
+
+```http
+GET /api/v1/admin/talksasa
+Authorization: Bearer <super-admin-token>
+```
+
+Nova calls TalkSasa `GET /me` and `GET /balance` server-side. The response includes remaining SMS units and a sanitized profile (name, email, status). It never includes `TALKSASA_API_TOKEN`. Customer billing still uses Nova wallets.
+
+### TalkSasa contacts
+
+Nova contacts and groups remain the source of truth. When a contact is in a Nova group that has a TalkSasa group UID, Nova mirrors:
+
+- `POST /contacts/{group_id}/store` on create / assign / import
+- `PATCH /contacts/{group_id}/update/{uid}` on contact update
+- `DELETE /contacts/{group_id}/delete/{uid}` on remove-from-group or delete contact
+
+TalkSasa contact UIDs are stored per membership (`contact_provider_uids`) and are never returned to the frontend. A contact in two Nova groups is stored twice on TalkSasa (once per group).
+
+### How to test SMS
+
+1. Set `TALKSASA_API_TOKEN` and `TALKSASA_SENDER_ID`.
+2. Top up an organization wallet.
+3. Send via `POST /api/v1/sms/send` with recipient `0712345678` (normalized to `254712345678`).
+4. Confirm `providerMessageId` is the TalkSasa UID, `smsUnits` matches message length, and the wallet was debited.
+5. Poll `GET /api/v1/sms/{id}/status` or wait for the status-sync job.
+
+### Rotate TalkSasa credentials
+
+1. Generate a new API token in the TalkSasa portal.
+2. Set `TALKSASA_API_TOKEN` on the server and restart the API.
+3. Revoke the old token in TalkSasa.
+4. Confirm a test SMS still sends. Do not put the token in Git, logs, or the Vue app.
+
+### Configure DLR callback (Africa's Talking fallback)
 
 In Africa's Talking, set the delivery report callback to:
 
@@ -301,7 +438,7 @@ Client (JWT / API Key)
    Domain Services ──► MySQL (Flyway)
         │
         ▼
-   SmsDeliveryService ──► SmsProvider (Africa's Talking)
+   SmsDeliveryService ──► SmsProvider (TalkSasa default)
         │
         ▼
    Status + ProviderRequestLog + Wallet debit/refund
@@ -309,9 +446,9 @@ Client (JWT / API Key)
 
 ### Wallet rules
 
-- SMS cost billed to the customer is per organization (`sms_cost`, default `1.00` KES); the provider (Africa's Talking) cost is the platform's own margin cost
-- Balance is checked before sending
-- Debit happens at send time; failed sends after max retries are refunded
+- SMS cost billed to the customer is per organization (`sms_cost`, default from `novastack.sms.pricing.price-per-unit`); TalkSasa's own cost stays with the platform
+- Balance is checked before sending, using SMS units (GSM-7 / Unicode segments), not 1 message = 1 SMS
+- Debit happens at send time; failed sends that were not accepted by the provider are refunded
 - Optimistic/pessimistic locking on wallet updates (`@Version` + `PESSIMISTIC_WRITE`)
 
 ### Sender IDs
@@ -326,7 +463,15 @@ Client (JWT / API Key)
 |----------------|-------------|
 | `spring.datasource.*` | MySQL connection |
 | `novastack.jwt.secret` | JWT signing secret |
-| `AT_USERNAME` / `novastack.africastalking.username` | AT username |
+| `SMS_PROVIDER` / `novastack.sms.provider` | `talksasa` (default) or `africastalking` |
+| `TALKSASA_API_TOKEN` / `novastack.sms.talksasa.api-token` | TalkSasa Bearer token (never expose to the frontend) |
+| `TALKSASA_SENDER_ID` / `novastack.sms.talksasa.default-sender-id` | TalkSasa sender when `senderId` is omitted (default `TALK-SASA`, max 11 characters). Override without a code change. |
+| `TALKSASA_BASE_URL` | TalkSasa API v3 base URL |
+| `TALKSASA_SYNC_CONTACT_GROUPS` / `novastack.sms.talksasa.sync-contact-groups` | Mirror Nova contact groups and members to TalkSasa (default `true`) |
+| `NOVASTACK_SMS_PRICING_WHATSAPP_PRICE_PER_UNIT` | Optional WhatsApp unit price; otherwise org SMS cost is used |
+| `SMS_BATCH_SIZE` / `novastack.sms.batch-size` | Recipients per TalkSasa send request |
+| `SMS_PRICE_PER_UNIT` / `novastack.sms.pricing.price-per-unit` | Default customer price per SMS unit |
+| `AT_USERNAME` / `novastack.africastalking.username` | AT username (fallback provider) |
 | `AT_API_KEY` / `novastack.africastalking.api-key` | AT API key |
 | `AT_BASE_URL` | Sandbox or production AT URL |
 | `MPESA_SHORTCODE` / `novastack.mpesa.shortcode` | Paybill shortcode |
@@ -350,7 +495,7 @@ Tests use an in-memory H2 profile (`src/test/resources/application-test.yaml`).
 
 1. Change `novastack.jwt.secret` to a strong secret (256-bit+)
 2. Use strong DB credentials; do not commit secrets
-3. Point `AT_BASE_URL` to production Africa's Talking
+3. Point TalkSasa credentials at your production token. Use `SMS_PROVIDER=africastalking` only if you intentionally switch providers.
 4. Put the service behind TLS (reverse proxy / load balancer)
 5. Configure AT DLR callback to your public HTTPS URL
 6. Monitor Actuator `/actuator/health`

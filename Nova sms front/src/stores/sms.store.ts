@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import type {
   BulkSmsRequest,
   BulkSmsResponse,
+  MessageChannel,
   ScheduleSmsRequest,
   SendSmsRequest,
   SmsHistoryFilters,
@@ -28,11 +29,11 @@ export const useSmsStore = defineStore('sms', () => {
   const error = ref<string | null>(null)
   const totalElements = ref(0)
 
-  async function fetchHistory(page = 0, size = 20) {
+  async function fetchHistory(page = 0, size = 20, channel: MessageChannel = 'SMS') {
     loading.value = true
     error.value = null
     try {
-      const result = await smsService.getHistory({ page, size })
+      const result = await smsService.getHistory({ page, size }, channel)
       let items = result.content
       if (filters.value.status) {
         items = items.filter((m) => m.status === filters.value.status)
@@ -67,11 +68,11 @@ export const useSmsStore = defineStore('sms', () => {
     }
   }
 
-  async function sendSms(payload: SendSmsRequest) {
+  async function sendSms(payload: SendSmsRequest, channel: MessageChannel = 'SMS') {
     loading.value = true
     error.value = null
     try {
-      lastSend.value = await smsService.send(payload)
+      lastSend.value = await smsService.send(payload, channel)
       return lastSend.value
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Send failed'
@@ -81,11 +82,11 @@ export const useSmsStore = defineStore('sms', () => {
     }
   }
 
-  async function sendBulk(payload: BulkSmsRequest) {
+  async function sendBulk(payload: BulkSmsRequest, channel: MessageChannel = 'SMS') {
     loading.value = true
     error.value = null
     try {
-      lastBulk.value = await smsService.sendBulk(payload)
+      lastBulk.value = await smsService.sendBulk(payload, channel)
       return lastBulk.value
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Bulk send failed'
@@ -95,11 +96,11 @@ export const useSmsStore = defineStore('sms', () => {
     }
   }
 
-  async function scheduleSms(payload: ScheduleSmsRequest) {
+  async function scheduleSms(payload: ScheduleSmsRequest, channel: MessageChannel = 'SMS') {
     loading.value = true
     error.value = null
     try {
-      lastBulk.value = await smsService.schedule(payload)
+      lastBulk.value = await smsService.schedule(payload, channel)
       return lastBulk.value
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Schedule failed'

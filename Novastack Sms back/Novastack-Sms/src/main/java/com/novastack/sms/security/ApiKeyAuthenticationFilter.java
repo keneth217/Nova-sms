@@ -1,12 +1,14 @@
 package com.novastack.sms.security;
 
-import com.novastack.sms.domain.enums.OrganizationStatus;
-import com.novastack.sms.domain.repository.OrganizationRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.novastack.sms.dto.response.ApiResponse;
+import com.novastack.sms.exception.ApiException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -22,7 +24,8 @@ public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
 
     public static final String API_KEY_HEADER = "X-API-Key";
 
-    private final OrganizationRepository organizationRepository;
+    private final ApiClientAuthService apiClientAuthService;
+    private final ObjectMapper objectMapper;
 
     @Override
     protected void doFilterInternal(
@@ -41,15 +44,27 @@ public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
 
-        organizationRepository.findByApiKeyAndStatus(apiKey, OrganizationStatus.ACTIVE)
-                .ifPresent(org -> {
-                    UserPrincipal principal = UserPrincipal.fromApiKey(org.getId(), org.getApiKey(), org.getName());
-                    var authentication = new UsernamePasswordAuthenticationToken(
-                            principal, null, principal.getAuthorities());
-                    authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                    SecurityContextHolder.getContext().setAuthentication(authentication);
-                });
+        try {
+            var principal = apiClientAuthService.authenticate(apiKey);
+            if (principal.isEmpty()) {
+                writeError(response, HttpServletResponse.SC_UNAUTHORIZED, "Invalid API key.");
+                return;
+            }
+            var authentication = new UsernamePasswordAuthenticationToken(
+                    principal.get(), null, principal.get().getAuthorities());
+            authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+            SecurityContextHolder.getContext().setAuthentication(authentication);
+        } catch (ApiException ex) {
+            writeError(response, ex.getStatus().value(), ex.getMessage());
+            return;
+        }
 
         filterChain.doFilter(request, response);
+    }
+
+    private void writeError(HttpServletResponse response, int status, String message) throws IOException {
+        response.setStatus(status);
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        objectMapper.writeValue(response.getOutputStream(), ApiResponse.fail(message));
     }
 }

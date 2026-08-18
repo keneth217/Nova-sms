@@ -24,6 +24,8 @@ public interface ContactRepository extends JpaRepository<Contact, UUID> {
 
     boolean existsByOrganizationIdAndPhone(UUID organizationId, String phone);
 
+    boolean existsByOrganizationIdAndPhoneAndIdNot(UUID organizationId, String phone, UUID id);
+
     List<Contact> findByOrganizationIdAndGroupsId(UUID organizationId, UUID groupId);
 
     List<Contact> findByOrganizationIdAndIdIn(UUID organizationId, Collection<UUID> ids);

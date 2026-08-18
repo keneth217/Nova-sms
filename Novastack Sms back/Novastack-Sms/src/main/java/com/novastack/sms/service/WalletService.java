@@ -26,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -40,6 +41,8 @@ public class WalletService {
     private final OrganizationRepository organizationRepository;
     private final AppProperties appProperties;
     private final MpesaDarajaClient mpesaDarajaClient;
+    private final BillingSettingsService billingSettingsService;
+    private final SmsBillingCalculator smsBillingCalculator;
 
     /**
      * Creates a zero-balance prepaid wallet for a new organization (register / ensure).
@@ -78,14 +81,16 @@ public class WalletService {
 
     @Transactional
     public WalletBalanceResponse getBalance(UUID organizationId) {
-        Organization org = getOrganization(organizationId);
+        getOrganization(organizationId);
         Wallet wallet = ensureWallet(organizationId);
+        BigDecimal smsCost = billingSettingsService.customerPrice();
         return WalletBalanceResponse.builder()
                 .walletId(wallet.getId())
                 .organizationId(organizationId)
                 .balance(wallet.getBalance())
-                .currency(wallet.getCurrency())
-                .smsCost(org.getSmsCost())
+                .currency(wallet.getCurrency() != null ? wallet.getCurrency() : billingSettingsService.currency())
+                .smsCost(smsCost)
+                .availableSms(smsBillingCalculator.availableSms(wallet.getBalance()))
                 .build();
     }
 
@@ -386,24 +391,28 @@ public class WalletService {
         return Map.of("ResultCode", 0, "ResultDesc", "Accepted");
     }
 
+    /** Super-admin allocation / internal funding. Still a real wallet credit — SMS continues to debit. */
     @Transactional
-    public void debitForSms(UUID organizationId, BigDecimal amount, String reference, String description) {
-        Wallet wallet = walletRepository.findByOrganizationIdForUpdate(organizationId)
-                .orElseThrow(() -> new ApiException("Wallet not found", HttpStatus.NOT_FOUND));
-
-        if (wallet.getBalance().compareTo(amount) < 0) {
-            throw new ApiException("Insufficient wallet balance", HttpStatus.PAYMENT_REQUIRED);
+    public void adjust(UUID organizationId, BigDecimal amount, String reference, String description) {
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new ApiException("Amount must be greater than zero", HttpStatus.BAD_REQUEST);
         }
+        Wallet wallet = walletRepository.findByOrganizationIdForUpdate(organizationId)
+                .orElseGet(() -> {
+                    ensureWallet(organizationId);
+                    return walletRepository.findByOrganizationIdForUpdate(organizationId)
+                            .orElseThrow(() -> new ApiException("Wallet not found", HttpStatus.NOT_FOUND));
+                });
 
         BigDecimal before = wallet.getBalance();
-        BigDecimal after = before.subtract(amount);
+        BigDecimal after = before.add(amount);
         wallet.setBalance(after);
         walletRepository.save(wallet);
 
         walletTransactionRepository.save(WalletTransaction.builder()
                 .organization(wallet.getOrganization())
                 .wallet(wallet)
-                .type(WalletTransactionType.SMS_DEBIT)
+                .type(WalletTransactionType.ADJUSTMENT)
                 .amount(amount)
                 .balanceBefore(before)
                 .balanceAfter(after)
@@ -414,6 +423,14 @@ public class WalletService {
 
     @Transactional
     public void refund(UUID organizationId, BigDecimal amount, String reference, String description) {
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            return;
+        }
+        if (reference != null && walletTransactionRepository.findByReference(reference).isPresent()) {
+            log.info("Skipping duplicate wallet refund reference={}", reference);
+            return;
+        }
+
         Wallet wallet = walletRepository.findByOrganizationIdForUpdate(organizationId)
                 .orElseThrow(() -> new ApiException("Wallet not found", HttpStatus.NOT_FOUND));
 
@@ -436,14 +453,70 @@ public class WalletService {
 
     @Transactional
     public void assertSufficientBalance(UUID organizationId, int messageCount) {
-        Organization org = getOrganization(organizationId);
-        Wallet wallet = ensureWallet(organizationId);
-        BigDecimal required = org.getSmsCost().multiply(BigDecimal.valueOf(messageCount));
-        if (wallet.getBalance().compareTo(required) < 0) {
-            throw new ApiException(
-                    "Insufficient wallet balance. Required: " + required + " " + wallet.getCurrency(),
-                    HttpStatus.PAYMENT_REQUIRED);
+        BigDecimal required = billingSettingsService.customerPrice().multiply(BigDecimal.valueOf(messageCount));
+        assertSufficientAmount(organizationId, required);
+    }
+
+    @Transactional
+    public void assertSufficientAmount(UUID organizationId, BigDecimal required) {
+        Wallet wallet = walletRepository.findByOrganizationIdForUpdate(organizationId)
+                .orElseGet(() -> {
+                    ensureWallet(organizationId);
+                    return walletRepository.findByOrganizationIdForUpdate(organizationId)
+                            .orElseThrow(() -> new ApiException("Wallet not found", HttpStatus.NOT_FOUND));
+                });
+        if (required == null) {
+            required = BigDecimal.ZERO;
         }
+        if (wallet.getBalance().compareTo(required) < 0) {
+            throw insufficient(required, wallet);
+        }
+    }
+
+    @Transactional
+    public void debitForSms(UUID organizationId, BigDecimal amount, String reference, String description) {
+        if (reference != null && walletTransactionRepository.findByReference(reference).isPresent()) {
+            log.info("Skipping duplicate wallet debit reference={}", reference);
+            return;
+        }
+        Wallet wallet = walletRepository.findByOrganizationIdForUpdate(organizationId)
+                .orElseThrow(() -> new ApiException("Wallet not found", HttpStatus.NOT_FOUND));
+
+        if (wallet.getBalance().compareTo(amount) < 0) {
+            throw insufficient(amount, wallet);
+        }
+
+        BigDecimal before = wallet.getBalance();
+        BigDecimal after = before.subtract(amount);
+        if (after.compareTo(BigDecimal.ZERO) < 0) {
+            throw insufficient(amount, wallet);
+        }
+        wallet.setBalance(after);
+        walletRepository.save(wallet);
+
+        walletTransactionRepository.save(WalletTransaction.builder()
+                .organization(wallet.getOrganization())
+                .wallet(wallet)
+                .type(WalletTransactionType.SMS_DEBIT)
+                .amount(amount)
+                .balanceBefore(before)
+                .balanceAfter(after)
+                .reference(reference)
+                .description(description)
+                .build());
+    }
+
+    private ApiException insufficient(BigDecimal required, Wallet wallet) {
+        BigDecimal need = required == null ? BigDecimal.ZERO : required.setScale(2, java.math.RoundingMode.HALF_UP);
+        BigDecimal available = wallet.getBalance() == null
+                ? BigDecimal.ZERO
+                : wallet.getBalance().setScale(2, java.math.RoundingMode.HALF_UP);
+        String currency = wallet.getCurrency() != null ? wallet.getCurrency() : billingSettingsService.currency();
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("required", need);
+        data.put("available", available);
+        data.put("currency", currency);
+        return new ApiException("Insufficient wallet balance", HttpStatus.PAYMENT_REQUIRED, data);
     }
 
     public Page<WalletTransactionResponse> history(

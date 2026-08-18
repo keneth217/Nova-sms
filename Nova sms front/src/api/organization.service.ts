@@ -5,6 +5,8 @@ import type {
   Organization,
   OrganizationStatus,
   PlatformOverview,
+  TalkSasaAccount,
+  PlatformBilling,
 } from '@/models/organization.model'
 import type { User } from '@/models/user.model'
 import type { TopupStatus, WalletTransaction } from '@/models/wallet.model'
@@ -13,6 +15,28 @@ class OrganizationService {
   async getCurrent(): Promise<Organization> {
     const { data } = await api.get<ApiResponse<Organization>>('/organizations/me')
     if (!data.success || !data.data) throw new Error(data.message || 'Failed to load organization')
+    return data.data
+  }
+
+  async getTalkSasaAccount(): Promise<TalkSasaAccount> {
+    const { data } = await api.get<ApiResponse<TalkSasaAccount>>('/admin/talksasa')
+    if (!data.success || !data.data) throw new Error(data.message || 'Failed to load TalkSasa account')
+    return data.data
+  }
+
+  async getBilling(): Promise<PlatformBilling> {
+    const { data } = await api.get<ApiResponse<PlatformBilling>>('/admin/billing')
+    if (!data.success || !data.data) throw new Error(data.message || 'Failed to load billing')
+    return data.data
+  }
+
+  async updateBilling(payload: {
+    customerSmsPrice?: number
+    providerCost?: number
+    currency?: string
+  }): Promise<PlatformBilling> {
+    const { data } = await api.put<ApiResponse<PlatformBilling>>('/admin/billing', payload)
+    if (!data.success || !data.data) throw new Error(data.message || 'Failed to update billing')
     return data.data
   }
 

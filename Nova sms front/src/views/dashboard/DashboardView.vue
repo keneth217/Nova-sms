@@ -8,6 +8,8 @@ import {
   ExclamationTriangleIcon,
   CheckBadgeIcon,
   IdentificationIcon,
+  QueueListIcon,
+  BanknotesIcon,
 } from '@heroicons/vue/24/outline'
 import { useAuthStore } from '@/stores/auth.store'
 import { useReportStore } from '@/stores/report.store'
@@ -78,6 +80,27 @@ onMounted(async () => {
         tone="brand"
       />
       <StatCard
+        label="SMS price"
+        :value="`${formatCurrency(reports.dashboard?.smsPrice ?? 1)} / SMS`"
+        hint="Customer charge per SMS unit"
+        :icon="BanknotesIcon"
+        tone="default"
+      />
+      <StatCard
+        label="Available SMS"
+        :value="formatNumber(reports.dashboard?.availableSms ?? 0)"
+        hint="Wallet balance ÷ SMS price"
+        :icon="QueueListIcon"
+        tone="brand"
+      />
+      <StatCard
+        label="SMS sent"
+        :value="formatNumber(reports.dashboard?.smsSent ?? reports.dashboard?.smsSentThisMonth ?? 0)"
+        hint="Lifetime billed messages"
+        :icon="PaperAirplaneIcon"
+        tone="default"
+      />
+      <StatCard
         label="SMS sent today"
         :value="formatNumber(reports.dashboard?.smsSentToday ?? 0)"
         :hint="`Cost ${formatCurrency(reports.dashboard?.costToday ?? 0)}`"
@@ -99,11 +122,25 @@ onMounted(async () => {
         tone="success"
       />
       <StatCard
+        label="Pending / in flight"
+        :value="formatNumber(reports.dashboard?.pendingCount ?? 0)"
+        hint="Awaiting delivery this month"
+        :icon="QueueListIcon"
+        tone="warning"
+      />
+      <StatCard
         label="Failed messages"
         :value="formatNumber(reports.dashboard?.failedCount ?? 0)"
         hint="Month to date"
         :icon="ExclamationTriangleIcon"
         tone="danger"
+      />
+      <StatCard
+        label="SMS units"
+        :value="formatNumber(reports.dashboard?.totalSmsUnits ?? 0)"
+        :hint="`Spent ${formatCurrency(reports.dashboard?.totalAmountSpent ?? reports.dashboard?.costThisMonth ?? 0)}`"
+        :icon="ChartBarIcon"
+        tone="default"
       />
       <StatCard
         label="Active sender IDs"

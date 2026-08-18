@@ -26,16 +26,25 @@ function variantFor(status: string): Variant {
     case 'COMPLETED':
     case 'TOPUP':
     case 'BUSINESS':
+    case 'PREPAID':
+    case 'INTERNAL':
       return 'success'
     case 'PENDING':
+    case 'ACCEPTED':
+    case 'SENT':
     case 'SCHEDULED':
     case 'EVENT':
+    case 'QUEUED':
+    case 'PROCESSING':
+    case 'MONTHLY':
       return 'warning'
     case 'FAILED':
     case 'CANCELLED':
     case 'REJECTED':
     case 'SUSPENDED':
     case 'EXPIRED':
+    case 'DISABLED':
+    case 'REVOKED':
       return 'danger'
     case 'SMS_DEBIT':
       return 'info'

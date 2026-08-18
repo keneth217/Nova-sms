@@ -1,6 +1,7 @@
 package com.novastack.sms.dto.response;
 
 import com.novastack.sms.domain.enums.OrganizationAccountType;
+import com.novastack.sms.domain.enums.OrganizationBillingModel;
 import com.novastack.sms.domain.enums.OrganizationStatus;
 import lombok.Builder;
 import lombok.Data;
@@ -17,10 +18,10 @@ public class AdminOrganizationResponse {
     private String name;
     private String email;
     private String phone;
-    private String apiKey;
     private String mpesaAccountRef;
     private OrganizationStatus status;
     private OrganizationAccountType accountType;
+    private OrganizationBillingModel billingModel;
     private Instant expiresAt;
     private BigDecimal smsCost;
     private BigDecimal walletBalance;

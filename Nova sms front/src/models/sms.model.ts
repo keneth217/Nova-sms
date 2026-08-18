@@ -1,4 +1,16 @@
-export type MessageStatus = 'PENDING' | 'SCHEDULED' | 'DELIVERED' | 'FAILED'
+export type MessageChannel = 'SMS' | 'WHATSAPP'
+
+export type MessageStatus =
+  | 'PENDING'
+  | 'QUEUED'
+  | 'PROCESSING'
+  | 'ACCEPTED'
+  | 'SENT'
+  | 'SCHEDULED'
+  | 'DELIVERED'
+  | 'FAILED'
+  | 'REJECTED'
+  | 'CANCELLED'
 
 export interface SendSmsRequest {
   recipient: string
@@ -23,13 +35,22 @@ export interface ScheduleSmsRequest {
 
 export interface SmsMessage {
   id: string
+  messageId?: string | null
   organizationId?: string | null
   organizationName?: string | null
+  apiClientId?: string | null
   recipient: string
   content: string
+  channel?: MessageChannel | null
   senderId: string
   status: MessageStatus
   cost: number
+  smsUnits?: number | null
+  encoding?: string | null
+  characterCount?: number | null
+  unitPrice?: number | null
+  currency?: string | null
+  provider?: string | null
   batchId: string | null
   scheduledAt: string | null
   createdAt: string
@@ -41,6 +62,9 @@ export interface SmsMessage {
 export interface BulkSmsResponse {
   batchId: string
   queuedCount: number
+  recipientCount?: number
+  smsUnits?: number
+  status?: string
   messages: SmsMessage[]
 }
 

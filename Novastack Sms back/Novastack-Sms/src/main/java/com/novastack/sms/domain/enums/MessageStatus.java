@@ -1,14 +1,26 @@
 package com.novastack.sms.domain.enums;
 
-/**
- * Customer-facing SMS lifecycle:
- * {@code PENDING} while queued/submitted to the provider and awaiting DLR,
- * then {@code DELIVERED} or {@code FAILED} from the delivery report.
- * {@code SCHEDULED} is only used before the send time arrives.
- */
 public enum MessageStatus {
     PENDING,
+    QUEUED,
+    PROCESSING,
+    ACCEPTED,
+    SENT,
     SCHEDULED,
     DELIVERED,
-    FAILED
+    FAILED,
+    REJECTED,
+    CANCELLED;
+
+    public boolean isTerminal() {
+        return this == DELIVERED || this == FAILED || this == REJECTED || this == CANCELLED;
+    }
+
+    public boolean isInFlight() {
+        return this == PENDING || this == QUEUED || this == PROCESSING || this == ACCEPTED || this == SENT;
+    }
+
+    public boolean isBillableFailure() {
+        return this == FAILED || this == REJECTED || this == CANCELLED;
+    }
 }

@@ -17,6 +17,19 @@ spring:
 novastack:
   jwt:
     secret: test-secret-key-that-is-long-enough-for-hs256-algorithms
+  sms:
+    provider: talksasa
+    batch-size: 2
+    talksasa:
+      base-url: http://127.0.0.1:9
+      api-token: test-talksasa-token
+      default-sender-id: TALK-SASA
+    billing:
+      customer-price: 1.00
+      provider-cost: 0.35
+      currency: KES
+    status-sync:
+      enabled: false
   africastalking:
     username: sandbox
     api-key: test-key

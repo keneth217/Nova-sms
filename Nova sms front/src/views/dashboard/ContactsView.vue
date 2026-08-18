@@ -35,13 +35,21 @@ const message = ref('')
 const importError = ref('')
 
 const showGroupModal = ref(false)
+const showDeleteGroupModal = ref(false)
 const showContactModal = ref(false)
+const showDeleteContactModal = ref(false)
 const showImportModal = ref(false)
 const showAssignModal = ref(false)
 const savingGroup = ref(false)
+const deletingGroup = ref(false)
 const savingContact = ref(false)
+const deletingContact = ref(false)
 const assigning = ref(false)
 const removingId = ref('')
+const editingGroupId = ref('')
+const editingContactId = ref('')
+const groupToDelete = ref<ContactGroup | null>(null)
+const contactToDelete = ref<Contact | null>(null)
 const groupError = ref('')
 const contactError = ref('')
 const assignError = ref('')
@@ -117,7 +125,7 @@ watch(
   },
 )
 
-async function createGroup() {
+async function saveGroup() {
   groupError.value = ''
   message.value = ''
   const name = groupForm.name.trim()
@@ -127,23 +135,75 @@ async function createGroup() {
   }
   savingGroup.value = true
   try {
-    await contactService.createGroup({
+    const payload = {
       name,
       description: groupForm.description.trim() || undefined,
-    })
+    }
+    if (editingGroupId.value) {
+      await contactService.updateGroup(editingGroupId.value, payload)
+      message.value = 'Group updated.'
+    } else {
+      await contactService.createGroup(payload)
+      message.value = 'Group created.'
+    }
     showGroupModal.value = false
     groupForm.name = ''
     groupForm.description = ''
-    message.value = 'Group created.'
+    editingGroupId.value = ''
     await load()
   } catch (e) {
-    groupError.value = e instanceof Error ? e.message : 'Failed to create group'
+    groupError.value = e instanceof Error ? e.message : 'Failed to save group'
   } finally {
     savingGroup.value = false
   }
 }
 
-async function createContact() {
+function resetGroupForm() {
+  groupForm.name = ''
+  groupForm.description = ''
+  editingGroupId.value = ''
+  groupError.value = ''
+}
+
+function openGroupModal() {
+  resetGroupForm()
+  showGroupModal.value = true
+}
+
+function openEditGroup(group: ContactGroup) {
+  resetGroupForm()
+  editingGroupId.value = group.id
+  groupForm.name = group.name
+  groupForm.description = group.description || ''
+  showGroupModal.value = true
+}
+
+function openDeleteGroup(group: ContactGroup) {
+  groupToDelete.value = group
+  showDeleteGroupModal.value = true
+}
+
+async function deleteGroup() {
+  if (!groupToDelete.value) return
+  deletingGroup.value = true
+  message.value = ''
+  try {
+    await contactService.deleteGroup(groupToDelete.value.id)
+    if (selectedGroup.value === groupToDelete.value.id) {
+      selectedGroup.value = ''
+    }
+    message.value = `Deleted ${groupToDelete.value.name}. Contacts were kept.`
+    showDeleteGroupModal.value = false
+    groupToDelete.value = null
+    await load()
+  } catch (e) {
+    message.value = e instanceof Error ? e.message : 'Failed to delete group'
+  } finally {
+    deletingGroup.value = false
+  }
+}
+
+async function saveContact() {
   contactError.value = ''
   message.value = ''
   if (!contactForm.phone.trim()) {
@@ -152,33 +212,72 @@ async function createContact() {
   }
   savingContact.value = true
   try {
-    await contactService.createContact({
+    const payload = {
       phone: contactForm.phone,
       firstName: contactForm.firstName || undefined,
       lastName: contactForm.lastName || undefined,
       email: contactForm.email || undefined,
-      groupId: contactForm.groupId || undefined,
-    })
+      groupId: editingContactId.value ? undefined : contactForm.groupId || undefined,
+    }
+    if (editingContactId.value) {
+      await contactService.updateContact(editingContactId.value, payload)
+      message.value = 'Contact updated.'
+    } else {
+      await contactService.createContact(payload)
+      message.value = 'Contact added.'
+    }
     showContactModal.value = false
-    Object.assign(contactForm, { phone: '', firstName: '', lastName: '', email: '', groupId: '' })
-    message.value = 'Contact added.'
+    resetContactForm()
     await load()
   } catch (e) {
-    contactError.value = e instanceof Error ? e.message : 'Failed to add contact'
+    contactError.value = e instanceof Error ? e.message : 'Failed to save contact'
   } finally {
     savingContact.value = false
   }
 }
 
-function openGroupModal() {
-  groupError.value = ''
-  showGroupModal.value = true
+function resetContactForm() {
+  Object.assign(contactForm, { phone: '', firstName: '', lastName: '', email: '', groupId: '' })
+  editingContactId.value = ''
+  contactError.value = ''
 }
 
 function openContactModal() {
-  contactError.value = ''
+  resetContactForm()
   contactForm.groupId = selectedGroup.value || ''
   showContactModal.value = true
+}
+
+function openEditContact(contact: Contact) {
+  resetContactForm()
+  editingContactId.value = contact.id
+  contactForm.phone = contact.phone
+  contactForm.firstName = contact.firstName || ''
+  contactForm.lastName = contact.lastName || ''
+  contactForm.email = contact.email || ''
+  showContactModal.value = true
+}
+
+function openDeleteContact(contact: Contact) {
+  contactToDelete.value = contact
+  showDeleteContactModal.value = true
+}
+
+async function deleteContact() {
+  if (!contactToDelete.value) return
+  deletingContact.value = true
+  message.value = ''
+  try {
+    await contactService.deleteContact(contactToDelete.value.id)
+    message.value = 'Contact deleted.'
+    showDeleteContactModal.value = false
+    contactToDelete.value = null
+    await load()
+  } catch (e) {
+    message.value = e instanceof Error ? e.message : 'Failed to delete contact'
+  } finally {
+    deletingContact.value = false
+  }
 }
 
 function openAssignModal(preselectedContactIds: string[] = []) {
@@ -378,11 +477,10 @@ function openImportModal() {
     <p v-if="message" class="mb-4 text-sm text-emerald-700">{{ message }}</p>
 
     <div class="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-      <button
+      <div
         v-for="group in groups"
         :key="group.id"
-        type="button"
-        class="rounded-xl border p-4 text-left transition"
+        class="cursor-pointer rounded-xl border p-4 text-left transition"
         :class="
           selectedGroup === group.id
             ? 'border-brand-500 bg-brand-50 shadow-sm'
@@ -394,13 +492,30 @@ function openImportModal() {
         <p class="mt-1 text-xs text-slate-500">{{ group.description || 'No description' }}</p>
         <p class="mt-3 text-2xl font-semibold text-brand-700">{{ group.contactCount }}</p>
         <p class="text-xs text-slate-400">contacts</p>
-        <span
-          class="mt-3 inline-flex text-xs font-medium text-brand-700 hover:underline"
-          @click.stop="openAssignForGroup(group.id)"
-        >
-          Add members
-        </span>
-      </button>
+        <div class="mt-3 flex flex-wrap gap-3" @click.stop>
+          <button
+            type="button"
+            class="text-xs font-medium text-brand-700 hover:underline"
+            @click="openAssignForGroup(group.id)"
+          >
+            Add members
+          </button>
+          <button
+            type="button"
+            class="text-xs font-medium text-slate-600 hover:underline"
+            @click="openEditGroup(group)"
+          >
+            Rename
+          </button>
+          <button
+            type="button"
+            class="text-xs font-medium text-rose-600 hover:underline"
+            @click="openDeleteGroup(group)"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
     </div>
 
     <AppCard title="Contact directory" :padding="false">
@@ -444,6 +559,7 @@ function openImportModal() {
           <td class="px-4 py-3 text-slate-500">{{ formatDate(c.createdAt, false) }}</td>
           <td class="px-4 py-3">
             <div class="flex flex-wrap justify-end gap-2">
+              <AppButton size="sm" variant="ghost" @click="openEditContact(c)">Edit</AppButton>
               <AppButton size="sm" variant="ghost" @click="openAssignModal([c.id])">
                 Assign
               </AppButton>
@@ -456,14 +572,19 @@ function openImportModal() {
               >
                 Remove
               </AppButton>
+              <AppButton size="sm" variant="ghost" @click="openDeleteContact(c)">Delete</AppButton>
             </div>
           </td>
         </tr>
       </DataTable>
     </AppCard>
 
-    <AppModal :open="showGroupModal" title="Create contact group" @close="showGroupModal = false">
-      <form id="create-group-form" class="space-y-4" @submit.prevent="createGroup">
+    <AppModal
+      :open="showGroupModal"
+      :title="editingGroupId ? 'Rename contact group' : 'Create contact group'"
+      @close="showGroupModal = false"
+    >
+      <form id="save-group-form" class="space-y-4" @submit.prevent="saveGroup">
         <FormField label="Name" required>
           <AppInput v-model="groupForm.name" placeholder="e.g. Customers" autofocus />
         </FormField>
@@ -478,17 +599,41 @@ function openImportModal() {
         </AppButton>
         <AppButton
           type="submit"
-          form="create-group-form"
+          form="save-group-form"
           :loading="savingGroup"
           :disabled="!groupForm.name.trim()"
         >
-          Create
+          {{ editingGroupId ? 'Save' : 'Create' }}
         </AppButton>
       </template>
     </AppModal>
 
-    <AppModal :open="showContactModal" title="Add contact" @close="showContactModal = false">
-      <form id="create-contact-form" class="space-y-4" @submit.prevent="createContact">
+    <AppModal
+      :open="showDeleteGroupModal"
+      title="Delete contact group"
+      @close="showDeleteGroupModal = false"
+    >
+      <p class="text-sm text-slate-600">
+        Delete
+        <span class="font-semibold text-slate-900">{{ groupToDelete?.name }}</span>?
+        Contacts stay in the directory and can be assigned to other groups.
+      </p>
+      <template #footer>
+        <AppButton variant="secondary" :disabled="deletingGroup" @click="showDeleteGroupModal = false">
+          Cancel
+        </AppButton>
+        <AppButton variant="danger" :loading="deletingGroup" @click="deleteGroup">
+          Delete group
+        </AppButton>
+      </template>
+    </AppModal>
+
+    <AppModal
+      :open="showContactModal"
+      :title="editingContactId ? 'Edit contact' : 'Add contact'"
+      @close="showContactModal = false"
+    >
+      <form id="save-contact-form" class="space-y-4" @submit.prevent="saveContact">
         <FormField label="Phone" required>
           <AppInput v-model="contactForm.phone" type="tel" placeholder="0712345678" />
         </FormField>
@@ -503,7 +648,7 @@ function openImportModal() {
         <FormField label="Email">
           <AppInput v-model="contactForm.email" type="email" />
         </FormField>
-        <FormField label="Group">
+        <FormField v-if="!editingContactId" label="Group">
           <AppSelect v-model="contactForm.groupId">
             <option value="">None</option>
             <option v-for="g in groups" :key="g.id" :value="g.id">{{ g.name }}</option>
@@ -517,11 +662,40 @@ function openImportModal() {
         </AppButton>
         <AppButton
           type="submit"
-          form="create-contact-form"
+          form="save-contact-form"
           :loading="savingContact"
           :disabled="!contactForm.phone.trim()"
         >
-          Save
+          {{ editingContactId ? 'Save' : 'Add' }}
+        </AppButton>
+      </template>
+    </AppModal>
+
+    <AppModal
+      :open="showDeleteContactModal"
+      title="Delete contact"
+      @close="showDeleteContactModal = false"
+    >
+      <p class="text-sm text-slate-600">
+        Delete
+        <span class="font-semibold text-slate-900">
+          {{
+            [contactToDelete?.firstName, contactToDelete?.lastName].filter(Boolean).join(' ')
+              || contactToDelete?.phone
+          }}
+        </span>
+        ({{ contactToDelete?.phone }}) from this organization?
+      </p>
+      <template #footer>
+        <AppButton
+          variant="secondary"
+          :disabled="deletingContact"
+          @click="showDeleteContactModal = false"
+        >
+          Cancel
+        </AppButton>
+        <AppButton variant="danger" :loading="deletingContact" @click="deleteContact">
+          Delete contact
         </AppButton>
       </template>
     </AppModal>

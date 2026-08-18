@@ -12,12 +12,19 @@ import java.math.BigDecimal;
 public class AppProperties {
 
     private Jwt jwt = new Jwt();
+    private Api api = new Api();
     private Sms sms = new Sms();
     private AfricasTalking africastalking = new AfricasTalking();
     private Mpesa mpesa = new Mpesa();
     private DataBundles dataBundles = new DataBundles();
     private SuperAdmin superAdmin = new SuperAdmin();
     private OrganizationDefaults organization = new OrganizationDefaults();
+
+    @Getter
+    @Setter
+    public static class Api {
+        private String publicBaseUrl = "https://smsapi.novastack.co.ke";
+    }
 
     @Getter
     @Setter
@@ -29,9 +36,62 @@ public class AppProperties {
     @Getter
     @Setter
     public static class Sms {
+        private String provider = "talksasa";
         private BigDecimal defaultCost = new BigDecimal("1.00");
         private String platformSenderId = "NOVASTACK";
         private int maxRetries = 3;
+        private int batchSize = 100;
+        private Pricing pricing = new Pricing();
+        private Billing billing = new Billing();
+        private StatusSync statusSync = new StatusSync();
+        private TalkSasa talksasa = new TalkSasa();
+    }
+
+    @Getter
+    @Setter
+    public static class Pricing {
+        private BigDecimal pricePerUnit = new BigDecimal("1.00");
+        private BigDecimal whatsappPricePerUnit;
+        private String currency = "KES";
+    }
+
+    @Getter
+    @Setter
+    public static class Billing {
+        private BigDecimal customerPrice = new BigDecimal("1.00");
+        private BigDecimal providerCost = new BigDecimal("0.35");
+        private String currency = "KES";
+    }
+
+    @Getter
+    @Setter
+    public static class StatusSync {
+        private boolean enabled = true;
+        private String cron = "0 */5 * * * *";
+        private int batchSize = 50;
+    }
+
+    @Getter
+    @Setter
+    public static class TalkSasa {
+        public static final String DEFAULT_SENDER_ID = "TALK-SASA";
+
+        private String baseUrl = "https://bulksms.talksasa.com/api/v3";
+        private String apiToken = "";
+        private String defaultSenderId = DEFAULT_SENDER_ID;
+        private int connectTimeoutMs = 5_000;
+        private int readTimeoutMs = 30_000;
+        private boolean syncContactGroups = true;
+
+        public String resolvedDefaultSenderId() {
+            String value = defaultSenderId == null || defaultSenderId.isBlank()
+                    ? DEFAULT_SENDER_ID
+                    : defaultSenderId.trim();
+            if ("TALK_SASA".equalsIgnoreCase(value)) {
+                return DEFAULT_SENDER_ID;
+            }
+            return value;
+        }
     }
 
     @Getter

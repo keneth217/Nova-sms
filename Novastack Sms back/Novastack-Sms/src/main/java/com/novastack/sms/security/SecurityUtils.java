@@ -62,4 +62,12 @@ public final class SecurityUtils {
         }
         return requireOrganizationId();
     }
+
+    public static java.util.Optional<UUID> optionalApiClientId() {
+        return optionalUser().map(UserPrincipal::getApiClientId).filter(id -> id != null);
+    }
+
+    public static UUID requireApiClientOrganization(UUID requestedOrganizationId) {
+        return resolveOrganizationId(requestedOrganizationId);
+    }
 }

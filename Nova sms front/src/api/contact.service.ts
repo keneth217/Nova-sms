@@ -26,6 +26,16 @@ class ContactService {
     return data.data
   }
 
+  async updateGroup(groupId: string, payload: ContactGroupRequest): Promise<ContactGroup> {
+    const { data } = await api.patch<ApiResponse<ContactGroup>>(`/contacts/groups/${groupId}`, payload)
+    if (!data.success || !data.data) throw new Error(data.message || 'Failed to update group')
+    return data.data
+  }
+
+  async deleteGroup(groupId: string): Promise<void> {
+    await api.delete(`/contacts/groups/${groupId}`)
+  }
+
   async listContacts(params: PageRequest & { groupId?: string } = {}): Promise<Page<Contact>> {
     const { data } = await api.get<ApiResponse<Page<Contact>>>('/contacts', { params })
     if (!data.success || !data.data) throw new Error(data.message || 'Failed to load contacts')
@@ -37,6 +47,17 @@ class ContactService {
     const { data } = await api.post<ApiResponse<Contact>>('/contacts', { ...payload, phone })
     if (!data.success || !data.data) throw new Error(data.message || 'Failed to create contact')
     return data.data
+  }
+
+  async updateContact(contactId: string, payload: ContactRequest): Promise<Contact> {
+    const phone = normalizePhone(payload.phone)
+    const { data } = await api.patch<ApiResponse<Contact>>(`/contacts/${contactId}`, { ...payload, phone })
+    if (!data.success || !data.data) throw new Error(data.message || 'Failed to update contact')
+    return data.data
+  }
+
+  async deleteContact(contactId: string): Promise<void> {
+    await api.delete(`/contacts/${contactId}`)
   }
 
   async importContacts(payload: BulkContactImportRequest): Promise<ImportResult> {

@@ -6,19 +6,48 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.util.Locale;
+
 @Component
 @RequiredArgsConstructor
 @Slf4j
 public class SmsProviderFactory {
 
+    public static final String TALKSASA = "talksasa";
+    public static final String AFRICAS_TALKING = "africastalking";
+
     private final AfricasTalkingSmsProvider africasTalkingSmsProvider;
+    private final TalkSasaSmsProvider talkSasaSmsProvider;
     private final AppProperties appProperties;
 
     public SmsProvider getDefaultProvider() {
-        return africasTalkingSmsProvider;
+        String configured = appProperties.getSms().getProvider();
+        if (configured != null && AFRICAS_TALKING.equals(configured.trim().toLowerCase(Locale.ROOT))) {
+            return africasTalkingSmsProvider;
+        }
+        return talkSasaSmsProvider;
+    }
+
+    public SmsProvider getProvider(String name) {
+        if (name == null || name.isBlank()) {
+            return getDefaultProvider();
+        }
+        String normalized = name.trim().toLowerCase(Locale.ROOT);
+        if (AFRICAS_TALKING.equals(normalized) || "africas_talking".equals(normalized)) {
+            return africasTalkingSmsProvider;
+        }
+        if (TALKSASA.equals(normalized)) {
+            return talkSasaSmsProvider;
+        }
+        return getDefaultProvider();
     }
 
     public SmsProvider.SmsProviderRequest buildRequest(Organization org, String recipient, String message, String senderId) {
+        return buildRequest(org, recipient, message, senderId, "plain");
+    }
+
+    public SmsProvider.SmsProviderRequest buildRequest(
+            Organization org, String recipient, String message, String senderId, String type) {
         AtCredentials credentials = resolveAtCredentials(org);
         return new SmsProvider.SmsProviderRequest(
                 credentials.username(),
@@ -26,7 +55,8 @@ public class SmsProviderFactory {
                 recipient,
                 message,
                 senderId,
-                credentials.baseUrl()
+                credentials.baseUrl(),
+                type
         );
     }
 
@@ -35,6 +65,15 @@ public class SmsProviderFactory {
             java.util.Collection<String> recipients,
             String message,
             String senderId) {
+        return buildBulkRequest(org, recipients, message, senderId, "plain");
+    }
+
+    public SmsProvider.SmsBulkRequest buildBulkRequest(
+            Organization org,
+            java.util.Collection<String> recipients,
+            String message,
+            String senderId,
+            String type) {
         AtCredentials credentials = resolveAtCredentials(org);
         return new SmsProvider.SmsBulkRequest(
                 credentials.username(),
@@ -42,7 +81,8 @@ public class SmsProviderFactory {
                 recipients,
                 message,
                 senderId,
-                credentials.baseUrl()
+                credentials.baseUrl(),
+                type
         );
     }
 

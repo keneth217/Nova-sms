@@ -58,6 +58,23 @@ public class ContactController {
         return ApiResponse.ok(contactService.getGroup(orgId, groupId));
     }
 
+    @PatchMapping("/groups/{groupId}")
+    @Operation(summary = "Rename a contact group")
+    public ApiResponse<ContactGroupResponse> updateGroup(
+            @PathVariable UUID groupId,
+            @Valid @RequestBody ContactGroupRequest request) {
+        UUID orgId = SecurityUtils.requireOrganizationId();
+        return ApiResponse.ok(contactService.updateGroup(orgId, groupId, request));
+    }
+
+    @DeleteMapping("/groups/{groupId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "Delete a contact group")
+    public void deleteGroup(@PathVariable UUID groupId) {
+        UUID orgId = SecurityUtils.requireOrganizationId();
+        contactService.deleteGroup(orgId, groupId);
+    }
+
     @PostMapping("/groups/{groupId}/members")
     @Operation(summary = "Add existing contacts to a group")
     public ApiResponse<Map<String, Object>> addToGroup(
@@ -81,6 +98,23 @@ public class ContactController {
     public ApiResponse<ContactResponse> create(@Valid @RequestBody ContactRequest request) {
         UUID orgId = SecurityUtils.requireOrganizationId();
         return ApiResponse.ok(contactService.createContact(orgId, request));
+    }
+
+    @PatchMapping("/{contactId}")
+    @Operation(summary = "Update a contact")
+    public ApiResponse<ContactResponse> update(
+            @PathVariable UUID contactId,
+            @Valid @RequestBody ContactRequest request) {
+        UUID orgId = SecurityUtils.requireOrganizationId();
+        return ApiResponse.ok(contactService.updateContact(orgId, contactId, request));
+    }
+
+    @DeleteMapping("/{contactId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "Delete a contact")
+    public void delete(@PathVariable UUID contactId) {
+        UUID orgId = SecurityUtils.requireOrganizationId();
+        contactService.deleteContact(orgId, contactId);
     }
 
     @PostMapping("/import")

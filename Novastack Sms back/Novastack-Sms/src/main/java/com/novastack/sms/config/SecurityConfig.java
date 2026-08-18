@@ -1,6 +1,7 @@
 package com.novastack.sms.config;
 
 import com.novastack.sms.security.ApiKeyAuthenticationFilter;
+import com.novastack.sms.security.ApiPermissionFilter;
 import com.novastack.sms.security.JsonAccessDeniedHandler;
 import com.novastack.sms.security.JsonAuthenticationEntryPoint;
 import com.novastack.sms.security.JwtAuthenticationFilter;
@@ -38,6 +39,7 @@ public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final ApiKeyAuthenticationFilter apiKeyAuthenticationFilter;
+    private final ApiPermissionFilter apiPermissionFilter;
     private final OrganizationExpiryFilter organizationExpiryFilter;
     private final JsonAuthenticationEntryPoint authenticationEntryPoint;
     private final JsonAccessDeniedHandler accessDeniedHandler;
@@ -93,6 +95,7 @@ public class SecurityConfig {
                 .authenticationProvider(authenticationProvider())
                 .addFilterBefore(apiKeyAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(apiPermissionFilter, JwtAuthenticationFilter.class)
                 .addFilterAfter(organizationExpiryFilter, JwtAuthenticationFilter.class);
 
         return http.build();
