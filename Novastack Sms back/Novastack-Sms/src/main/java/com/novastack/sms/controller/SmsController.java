@@ -136,7 +136,7 @@ public class SmsController {
     @Operation(summary = "Resend a failed SMS")
     @Parameter(name = IDEMPOTENCY_HEADER, in = ParameterIn.HEADER, required = false)
     public ApiResponse<SmsMessageResponse> resend(
-            @PathVariable UUID id,
+            @PathVariable String id,
             HttpServletRequest http) {
         UUID orgId = SecurityUtils.requireOrganizationId();
         UUID clientId = SecurityUtils.optionalApiClientId().orElse(null);
@@ -164,22 +164,28 @@ public class SmsController {
     }
 
     @GetMapping("/history")
-    @Operation(summary = "SMS send history")
+    @Operation(summary = "SMS send history for this organization")
     public ApiResponse<Page<SmsMessageResponse>> history(@PageableDefault(size = 20) Pageable pageable) {
         UUID orgId = SecurityUtils.requireOrganizationId();
         return ApiResponse.ok(smsService.history(orgId, pageable));
     }
 
+    @GetMapping
+    @Operation(summary = "SMS send history for this organization (same as /history)")
+    public ApiResponse<Page<SmsMessageResponse>> list(@PageableDefault(size = 20) Pageable pageable) {
+        return history(pageable);
+    }
+
     @GetMapping("/{id}/status")
-    @Operation(summary = "Refresh delivery status for an SMS using the Nova SMS id")
-    public ApiResponse<SmsMessageResponse> status(@PathVariable UUID id) {
+    @Operation(summary = "Refresh delivery status using the Nova SMS id or TalkSasa uid")
+    public ApiResponse<SmsMessageResponse> status(@PathVariable String id) {
         UUID orgId = SecurityUtils.requireOrganizationId();
-        return ApiResponse.ok(smsService.refreshStatus(orgId, id));
+        return ApiResponse.ok(smsService.refreshStatus(orgId, id, null));
     }
 
     @GetMapping("/{id}")
-    @Operation(summary = "Get an SMS by Nova SMS id")
-    public ApiResponse<SmsMessageResponse> get(@PathVariable UUID id) {
+    @Operation(summary = "Get an SMS by Nova SMS id or TalkSasa uid for this organization")
+    public ApiResponse<SmsMessageResponse> get(@PathVariable String id) {
         UUID orgId = SecurityUtils.requireOrganizationId();
         return ApiResponse.ok(smsService.getForOrganization(orgId, id));
     }

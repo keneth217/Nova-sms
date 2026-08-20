@@ -409,6 +409,12 @@ const routes: RouteRecordRaw[] = [
         meta: { requiresAuth: true, title: 'SMS settings', roles: ['SUPER_ADMIN'] },
       },
       {
+        path: 'admin/announcement',
+        name: 'admin-announcement',
+        component: () => import('@/views/admin/AnnouncementView.vue'),
+        meta: { requiresAuth: true, title: 'Announcement', roles: ['SUPER_ADMIN'] },
+      },
+      {
         path: 'admin/api-clients',
         redirect: { name: 'admin-developer-clients' },
       },

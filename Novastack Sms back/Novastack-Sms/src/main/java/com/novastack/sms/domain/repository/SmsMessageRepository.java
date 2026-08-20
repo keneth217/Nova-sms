@@ -32,7 +32,14 @@ public interface SmsMessageRepository extends JpaRepository<SmsMessage, UUID> {
 
     Optional<SmsMessage> findByIdAndOrganization_Id(UUID id, UUID organizationId);
 
+    @EntityGraph(attributePaths = "organization")
     Optional<SmsMessage> findByProviderMessageId(String providerMessageId);
+
+    @EntityGraph(attributePaths = "organization")
+    Optional<SmsMessage> findByOrganization_IdAndProviderMessageId(UUID organizationId, String providerMessageId);
+
+    @EntityGraph(attributePaths = "organization")
+    List<SmsMessage> findByProviderMessageIdIn(Collection<String> providerMessageIds);
 
     long countByApiClientId(UUID apiClientId);
 

@@ -26,6 +26,7 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -211,17 +212,23 @@ public class SmsService {
 
     @Transactional
     public SmsMessageResponse resend(UUID organizationId, UUID messageId) {
-        return resend(organizationId, messageId, MessageChannel.SMS);
+        return resend(organizationId, messageId.toString(), MessageChannel.SMS);
+    }
+
+    @Transactional
+    public SmsMessageResponse resend(UUID organizationId, String idOrUid) {
+        return resend(organizationId, idOrUid, MessageChannel.SMS);
     }
 
     @Transactional
     public SmsMessageResponse resend(UUID organizationId, UUID messageId, MessageChannel channel) {
+        return resend(organizationId, messageId.toString(), channel);
+    }
+
+    @Transactional
+    public SmsMessageResponse resend(UUID organizationId, String idOrUid, MessageChannel channel) {
         MessageChannel resolved = channel == null ? MessageChannel.SMS : channel;
-        SmsMessage original = smsMessageRepository.findByIdAndOrganization_Id(messageId, organizationId)
-                .orElseThrow(() -> new ApiException("SMS message not found", HttpStatus.NOT_FOUND));
-        if (!sameChannel(original, resolved)) {
-            throw new ApiException("SMS message not found", HttpStatus.NOT_FOUND);
-        }
+        SmsMessage original = requireOwnedMessage(organizationId, idOrUid, resolved);
         if (original.getStatus() == null || !original.getStatus().isBillableFailure()) {
             throw new ApiException("Only failed messages can be resent", HttpStatus.BAD_REQUEST);
         }
@@ -324,17 +331,22 @@ public class SmsService {
 
     @Transactional(readOnly = true)
     public SmsMessageResponse getForOrganization(UUID organizationId, UUID messageId) {
-        return getForOrganization(organizationId, messageId, null);
+        return getForOrganization(organizationId, messageId.toString(), null);
     }
 
     @Transactional(readOnly = true)
     public SmsMessageResponse getForOrganization(UUID organizationId, UUID messageId, MessageChannel channel) {
-        SmsMessage message = smsMessageRepository.findByIdAndOrganization_Id(messageId, organizationId)
-                .orElseThrow(() -> new ApiException("SMS message not found", HttpStatus.NOT_FOUND));
-        if (channel != null && message.getChannel() != null && message.getChannel() != channel) {
-            throw new ApiException("SMS message not found", HttpStatus.NOT_FOUND);
-        }
-        return toResponse(message);
+        return getForOrganization(organizationId, messageId.toString(), channel);
+    }
+
+    @Transactional(readOnly = true)
+    public SmsMessageResponse getForOrganization(UUID organizationId, String idOrUid) {
+        return getForOrganization(organizationId, idOrUid, null);
+    }
+
+    @Transactional(readOnly = true)
+    public SmsMessageResponse getForOrganization(UUID organizationId, String idOrUid, MessageChannel channel) {
+        return toResponse(requireOwnedMessage(organizationId, idOrUid, channel));
     }
 
     @Transactional(readOnly = true)
@@ -377,25 +389,78 @@ public class SmsService {
 
     @Transactional
     public SmsMessageResponse refreshStatusById(UUID messageId) {
-        SmsMessage message = smsMessageRepository.findByIdWithOrganization(messageId)
-                .orElseThrow(() -> new ApiException("SMS message not found", HttpStatus.NOT_FOUND));
-        return refreshStatus(message.getOrganization().getId(), messageId, message.getChannel());
+        return refreshStatusById(messageId.toString());
+    }
+
+    @Transactional
+    public SmsMessageResponse refreshStatusById(String idOrUid) {
+        SmsMessage message = requireAnyMessage(idOrUid);
+        smsStatusService.syncMessage(message);
+        return toResponse(smsMessageRepository.findById(message.getId()).orElse(message));
+    }
+
+    @Transactional(readOnly = true)
+    public SmsMessageResponse getByIdOrProviderUid(String idOrUid) {
+        return toResponse(requireAnyMessage(idOrUid));
     }
 
     @Transactional
     public SmsMessageResponse refreshStatus(UUID organizationId, UUID messageId) {
-        return refreshStatus(organizationId, messageId, null);
+        return refreshStatus(organizationId, messageId.toString(), null);
     }
 
     @Transactional
     public SmsMessageResponse refreshStatus(UUID organizationId, UUID messageId, MessageChannel channel) {
-        SmsMessage message = smsMessageRepository.findByIdAndOrganization_Id(messageId, organizationId)
-                .orElseThrow(() -> new ApiException("SMS message not found", HttpStatus.NOT_FOUND));
-        if (channel != null && message.getChannel() != null && message.getChannel() != channel) {
-            throw new ApiException("SMS message not found", HttpStatus.NOT_FOUND);
-        }
+        return refreshStatus(organizationId, messageId.toString(), channel);
+    }
+
+    @Transactional
+    public SmsMessageResponse refreshStatus(UUID organizationId, String idOrUid, MessageChannel channel) {
+        SmsMessage message = requireOwnedMessage(organizationId, idOrUid, channel);
         smsStatusService.syncMessage(message);
         return toResponse(smsMessageRepository.findById(message.getId()).orElse(message));
+    }
+
+    private SmsMessage requireOwnedMessage(UUID organizationId, String idOrUid, MessageChannel channel) {
+        SmsMessage message = findOwned(organizationId, idOrUid)
+                .orElseThrow(() -> new ApiException("SMS message not found", HttpStatus.NOT_FOUND));
+        if (channel != null && !sameChannel(message, channel)) {
+            throw new ApiException("SMS message not found", HttpStatus.NOT_FOUND);
+        }
+        return message;
+    }
+
+    private Optional<SmsMessage> findOwned(UUID organizationId, String idOrUid) {
+        if (idOrUid == null || idOrUid.isBlank()) {
+            return Optional.empty();
+        }
+        String key = idOrUid.trim();
+        Optional<SmsMessage> byId = parseUuid(key)
+                .flatMap(id -> smsMessageRepository.findByIdAndOrganization_Id(id, organizationId));
+        if (byId.isPresent()) {
+            return byId;
+        }
+        return smsMessageRepository.findByOrganization_IdAndProviderMessageId(organizationId, key);
+    }
+
+    private SmsMessage requireAnyMessage(String idOrUid) {
+        if (idOrUid == null || idOrUid.isBlank()) {
+            throw new ApiException("SMS message not found", HttpStatus.NOT_FOUND);
+        }
+        String key = idOrUid.trim();
+        Optional<SmsMessage> found = parseUuid(key).flatMap(smsMessageRepository::findByIdWithOrganization);
+        if (found.isEmpty()) {
+            found = smsMessageRepository.findByProviderMessageId(key);
+        }
+        return found.orElseThrow(() -> new ApiException("SMS message not found", HttpStatus.NOT_FOUND));
+    }
+
+    private static Optional<UUID> parseUuid(String value) {
+        try {
+            return Optional.of(UUID.fromString(value));
+        } catch (IllegalArgumentException ex) {
+            return Optional.empty();
+        }
     }
 
     private Set<String> resolveRecipients(UUID organizationId, List<String> recipients, UUID groupId) {
@@ -468,6 +533,7 @@ public class SmsService {
                 .unitPrice(message.getUnitPrice())
                 .currency(message.getCurrency())
                 .provider(message.getProvider())
+                .providerMessageId(message.getProviderMessageId())
                 .batchId(message.getBatchId())
                 .scheduledAt(message.getScheduledAt())
                 .createdAt(message.getCreatedAt())

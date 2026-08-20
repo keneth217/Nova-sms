@@ -11,10 +11,12 @@ import com.novastack.sms.dto.request.CreditMpesaReceiptRequest;
 import com.novastack.sms.dto.request.VerifyMpesaReceiptRequest;
 import com.novastack.sms.dto.request.CreateApiClientRequest;
 import com.novastack.sms.dto.request.SendSmsRequest;
+import com.novastack.sms.dto.request.UpdateAnnouncementRequest;
 import com.novastack.sms.dto.request.UpdateApiClientRequest;
 import com.novastack.sms.dto.request.UpdatePlatformBillingRequest;
 import com.novastack.sms.dto.request.UpdatePlatformSmsSettingsRequest;
 import com.novastack.sms.dto.response.AdminOrganizationResponse;
+import com.novastack.sms.dto.response.AnnouncementResponse;
 import com.novastack.sms.dto.response.ApiClientCreatedResponse;
 import com.novastack.sms.dto.response.ApiClientResponse;
 import com.novastack.sms.dto.response.ApiClientUsageResponse;
@@ -28,14 +30,18 @@ import com.novastack.sms.dto.response.PlatformOverviewResponse;
 import com.novastack.sms.dto.response.SmsMessageResponse;
 import com.novastack.sms.dto.response.StkPushResponse;
 import com.novastack.sms.dto.response.TalkSasaAccountResponse;
+import com.novastack.sms.dto.response.TalkSasaSmsListResponse;
+import com.novastack.sms.dto.response.TalkSasaSmsViewResponse;
 import com.novastack.sms.dto.response.UserResponse;
 import com.novastack.sms.dto.response.WalletTransactionResponse;
 import com.novastack.sms.service.AdminService;
+import com.novastack.sms.service.AnnouncementService;
 import com.novastack.sms.service.ApiClientService;
 import com.novastack.sms.service.DeveloperPortalService;
 import com.novastack.sms.service.PaybillCollectionService;
 import com.novastack.sms.service.SenderIdService;
 import com.novastack.sms.service.SmsService;
+import com.novastack.sms.service.TalkSasaInboxService;
 import com.novastack.sms.service.WalletService;
 import com.novastack.sms.provider.TalkSasaProfileClient;
 import io.swagger.v3.oas.annotations.Operation;
@@ -74,9 +80,11 @@ public class AdminController {
     private final SmsService smsService;
     private final SenderIdService senderIdService;
     private final TalkSasaProfileClient talkSasaProfileClient;
+    private final TalkSasaInboxService talkSasaInboxService;
     private final DeveloperPortalService developerPortalService;
     private final WalletService walletService;
     private final PaybillCollectionService paybillCollectionService;
+    private final AnnouncementService announcementService;
 
     @GetMapping("/organizations")
     @Operation(summary = "List all registered organizations")
@@ -153,6 +161,20 @@ public class AdminController {
         return ApiResponse.ok(talkSasaProfileClient.getAccount());
     }
 
+    @GetMapping("/talksasa/sms")
+    @Operation(summary = "Live TalkSasa message list (GET /sms). Super Admin only; shared provider inbox")
+    public ApiResponse<TalkSasaSmsListResponse> talksasaSms(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "25") int size) {
+        return ApiResponse.ok(talkSasaInboxService.list(page, size));
+    }
+
+    @GetMapping("/talksasa/sms/{uid}")
+    @Operation(summary = "Live TalkSasa message (GET /sms/{uid}). Super Admin only")
+    public ApiResponse<TalkSasaSmsViewResponse> talksasaSmsOne(@PathVariable String uid) {
+        return ApiResponse.ok(talkSasaInboxService.get(uid));
+    }
+
     @GetMapping("/billing")
     @Operation(summary = "Platform SMS billing settings and Super Admin revenue report")
     public ApiResponse<PlatformBillingResponse> billing() {
@@ -177,6 +199,19 @@ public class AdminController {
     public ApiResponse<PlatformNotificationSettingsResponse> updateNotifications(
             @Valid @RequestBody UpdatePlatformSmsSettingsRequest request) {
         return ApiResponse.ok(adminService.updatePlatformNotifications(request));
+    }
+
+    @GetMapping("/announcement")
+    @Operation(summary = "Dashboard announcement banner")
+    public ApiResponse<AnnouncementResponse> announcement() {
+        return ApiResponse.ok(announcementService.current());
+    }
+
+    @PutMapping("/announcement")
+    @Operation(summary = "Update dashboard announcement banner")
+    public ApiResponse<AnnouncementResponse> updateAnnouncement(
+            @Valid @RequestBody UpdateAnnouncementRequest request) {
+        return ApiResponse.ok("Announcement saved", announcementService.update(request));
     }
 
     @GetMapping("/mpesa/c2b/urls")
@@ -301,9 +336,15 @@ public class AdminController {
         return ApiResponse.ok("SMS queued", developerPortalService.testSend(clientId, request));
     }
 
+    @GetMapping("/sms/{id}")
+    @Operation(summary = "Get any organization SMS by Nova id or TalkSasa uid")
+    public ApiResponse<SmsMessageResponse> getSms(@PathVariable String id) {
+        return ApiResponse.ok(smsService.getByIdOrProviderUid(id));
+    }
+
     @GetMapping("/sms/{id}/status")
     @Operation(summary = "Refresh delivery status for any organization SMS")
-    public ApiResponse<SmsMessageResponse> refreshSmsStatus(@PathVariable UUID id) {
+    public ApiResponse<SmsMessageResponse> refreshSmsStatus(@PathVariable String id) {
         return ApiResponse.ok(smsService.refreshStatusById(id));
     }
 }

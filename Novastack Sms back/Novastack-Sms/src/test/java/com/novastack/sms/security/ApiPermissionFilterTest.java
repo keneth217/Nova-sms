@@ -27,6 +27,8 @@ class ApiPermissionFilterTest {
                         "/api/v1/sms/batches/11111111-1111-1111-1111-111111111111"));
         assertEquals(ApiPermission.SMS_HISTORY,
                 ApiPermissionFilter.requiredPermission("GET", "/api/v1/sms/history"));
+        assertEquals(ApiPermission.SMS_HISTORY,
+                ApiPermissionFilter.requiredPermission("GET", "/api/v1/sms"));
         assertEquals(ApiPermission.SMS_STATUS,
                 ApiPermissionFilter.requiredPermission("GET", "/api/v1/sms/abc/status"));
         assertEquals(ApiPermission.SMS_STATUS,

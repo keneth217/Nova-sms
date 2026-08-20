@@ -31,6 +31,7 @@ const c2bUrls = ref<C2bCallbackUrls | null>(null)
 const c2bError = ref('')
 const c2bMessage = ref('')
 const registeringC2b = ref(false)
+const loadingDetails = ref(false)
 const orgForm = reactive({
   name: '',
   email: '',
@@ -68,13 +69,15 @@ const thresholdPlaceholder = computed(() => {
 
 function fillOrgForm() {
   const current = org.currentOrganization
-  if (!current) return
-  orgForm.name = current.name || ''
-  orgForm.email = current.email || ''
-  orgForm.phone = current.phone || ''
-  notificationsEnabled.value = current.notificationsEnabled !== false
-  if (current.lowBalanceThreshold != null && Number.isFinite(Number(current.lowBalanceThreshold))) {
-    threshold.value = String(current.lowBalanceThreshold)
+  const user = auth.user
+  orgForm.name = current?.name || user?.organizationName || ''
+  orgForm.email = current?.email || user?.email || ''
+  orgForm.phone = current?.phone || user?.phone || ''
+  if (current) {
+    notificationsEnabled.value = current.notificationsEnabled !== false
+    if (current.lowBalanceThreshold != null && Number.isFinite(Number(current.lowBalanceThreshold))) {
+      threshold.value = String(current.lowBalanceThreshold)
+    }
   }
 }
 
@@ -123,14 +126,19 @@ onMounted(async () => {
     }
     return
   }
-  if (auth.user?.organizationId) {
-    try {
-      await org.fetchCurrentOrganization()
-    } catch {
-      if (auth.user?.organizationName) {
-        org.setOrganizationName(auth.user.organizationName)
-      }
+  loadingDetails.value = true
+  detailsError.value = ''
+  try {
+    await org.fetchCurrentOrganization()
+    fillOrgForm()
+  } catch (e) {
+    fillOrgForm()
+    detailsError.value = e instanceof Error ? e.message : 'Failed to load organization details'
+    if (auth.user?.organizationName) {
+      org.setOrganizationName(auth.user.organizationName)
     }
+  } finally {
+    loadingDetails.value = false
   }
 })
 
@@ -253,18 +261,19 @@ async function saveOrgDetails() {
         subtitle="Update the name, email, and phone used for login and SMS alerts."
       >
         <form class="space-y-4" @submit.prevent="saveOrgDetails">
+          <p v-if="loadingDetails" class="text-sm text-slate-500">Loading organization details…</p>
           <FormField label="Name" required>
-            <AppInput v-model="orgForm.name" type="text" maxlength="150" />
+            <AppInput v-model="orgForm.name" type="text" maxlength="150" :disabled="loadingDetails" />
           </FormField>
           <FormField label="Email" required hint="Used for login when it matches the admin user email.">
-            <AppInput v-model="orgForm.email" type="email" maxlength="180" />
+            <AppInput v-model="orgForm.email" type="email" maxlength="180" :disabled="loadingDetails" />
           </FormField>
           <FormField
             label="Phone"
             required
             hint="Kenyan mobile used for login and low-balance SMS, for example 0711766223."
           >
-            <AppInput v-model="orgForm.phone" type="tel" maxlength="30" />
+            <AppInput v-model="orgForm.phone" type="tel" maxlength="30" :disabled="loadingDetails" />
           </FormField>
           <dl class="space-y-4 text-sm">
             <div
@@ -306,7 +315,9 @@ async function saveOrgDetails() {
           </dl>
           <p v-if="detailsError" class="text-sm text-rose-600">{{ detailsError }}</p>
           <p v-if="detailsMessage" class="text-sm text-emerald-700">{{ detailsMessage }}</p>
-          <AppButton type="submit" :loading="savingDetails">Save organization details</AppButton>
+          <AppButton type="submit" :loading="savingDetails || loadingDetails" :disabled="loadingDetails">
+            Save organization details
+          </AppButton>
         </form>
       </AppCard>
 

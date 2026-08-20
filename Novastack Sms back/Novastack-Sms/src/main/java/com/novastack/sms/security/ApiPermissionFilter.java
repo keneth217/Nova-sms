@@ -102,7 +102,8 @@ public class ApiPermissionFilter extends OncePerRequestFilter {
         if ("GET".equalsIgnoreCase(method) && path.matches("/api/v1/sms/batches/[^/]+$")) {
             return ApiPermission.SMS_STATUS;
         }
-        if ("GET".equalsIgnoreCase(method) && path.endsWith("/sms/history")) {
+        if ("GET".equalsIgnoreCase(method)
+                && (path.equals("/api/v1/sms") || path.equals("/api/v1/sms/") || path.endsWith("/sms/history"))) {
             return ApiPermission.SMS_HISTORY;
         }
         if ("GET".equalsIgnoreCase(method) && path.contains("/sms/") && path.endsWith("/status")) {

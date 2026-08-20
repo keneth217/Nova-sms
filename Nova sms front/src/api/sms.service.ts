@@ -7,6 +7,8 @@ import type {
   ScheduleSmsRequest,
   SendSmsRequest,
   SmsMessage,
+  TalkSasaSmsList,
+  TalkSasaSmsView,
 } from '@/models/sms.model'
 import { normalizePhone } from '@/utils/format'
 
@@ -92,6 +94,22 @@ class SmsService {
   async resend(id: string, channel: MessageChannel = 'SMS'): Promise<SmsMessage> {
     const { data } = await api.post<ApiResponse<SmsMessage>>(`${channelRoot(channel)}/${id}/resend`)
     if (!data.success || !data.data) throw new Error(data.message || 'Failed to resend message')
+    return data.data
+  }
+
+  async listTalkSasaSms(page = 1, size = 25): Promise<TalkSasaSmsList> {
+    const { data } = await api.get<ApiResponse<TalkSasaSmsList>>('/admin/talksasa/sms', {
+      params: { page, size },
+    })
+    if (!data.success || !data.data) throw new Error(data.message || 'Failed to load TalkSasa SMS')
+    return data.data
+  }
+
+  async getTalkSasaSms(uid: string): Promise<TalkSasaSmsView> {
+    const { data } = await api.get<ApiResponse<TalkSasaSmsView>>(
+      `/admin/talksasa/sms/${encodeURIComponent(uid)}`,
+    )
+    if (!data.success || !data.data) throw new Error(data.message || 'Failed to load TalkSasa SMS')
     return data.data
   }
 }

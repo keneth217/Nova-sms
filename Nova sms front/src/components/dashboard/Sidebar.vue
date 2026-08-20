@@ -22,6 +22,7 @@ import {
   UserCircleIcon,
   DevicePhoneMobileIcon,
   BellAlertIcon,
+  MegaphoneIcon,
   XMarkIcon,
 } from '@heroicons/vue/24/outline'
 import { useAuthStore } from '@/stores/auth.store'
@@ -57,6 +58,7 @@ const adminLinks = [
   { to: '/admin/collections', label: 'Paybill collections', icon: ChartPieIcon },
   { to: '/admin/sms-monitoring', label: 'SMS Monitoring', icon: SignalIcon },
   { to: '/admin/sms-settings', label: 'SMS settings', icon: BellAlertIcon },
+  { to: '/admin/announcement', label: 'Announcement', icon: MegaphoneIcon },
   { to: '/admin/developer', label: 'Developer', icon: BookOpenIcon },
   { to: '/sender-ids', label: 'Sender IDs', icon: IdentificationIcon },
   { to: '/profile', label: 'Profile', icon: UserCircleIcon },

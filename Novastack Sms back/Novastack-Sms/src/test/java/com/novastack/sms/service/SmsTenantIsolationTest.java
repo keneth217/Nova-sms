@@ -59,8 +59,22 @@ class SmsTenantIsolationTest {
         UUID messageId = UUID.randomUUID();
 
         when(smsMessageRepository.findByIdAndOrganization_Id(messageId, orgA)).thenReturn(Optional.empty());
+        when(smsMessageRepository.findByOrganization_IdAndProviderMessageId(orgA, messageId.toString()))
+                .thenReturn(Optional.empty());
 
         ApiException ex = assertThrows(ApiException.class, () -> smsService.getForOrganization(orgA, messageId));
+        assertEquals(HttpStatus.NOT_FOUND, ex.getStatus());
+    }
+
+    @Test
+    void organizationCannotReadAnotherOrganizationsTalkSasaUid() {
+        UUID orgA = UUID.randomUUID();
+        String uid = "606812e63f78b";
+
+        when(smsMessageRepository.findByOrganization_IdAndProviderMessageId(orgA, uid))
+                .thenReturn(Optional.empty());
+
+        ApiException ex = assertThrows(ApiException.class, () -> smsService.getForOrganization(orgA, uid));
         assertEquals(HttpStatus.NOT_FOUND, ex.getStatus());
     }
 }

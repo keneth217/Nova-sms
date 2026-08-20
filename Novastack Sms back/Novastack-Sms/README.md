@@ -353,18 +353,32 @@ Content-Type: application/json
 
 Messages are stored as `PENDING`, submitted to TalkSasa (or the configured provider), then updated to `ACCEPTED` / `SENT` / `DELIVERED` / `FAILED`. Status transitions: `PENDING` → `ACCEPTED` → `SENT` → `DELIVERED` / `FAILED`.
 
-### Check a message by Nova SMS id
+### Check a message by Nova SMS id or TalkSasa uid
 
 ```http
 GET /api/v1/sms/{id}
 Authorization: Bearer <token>
 ```
 
-Refresh provider status (TalkSasa `GET /sms/{uid}` is called internally; clients never use the TalkSasa UID):
+`{id}` is the Nova UUID (`data.id`) or TalkSasa uid (`data.providerMessageId`). Lookup is org-scoped: another organization's uid returns 404. Refresh provider status (Nova calls TalkSasa `GET /sms/{uid}` internally):
 
 ```http
 GET /api/v1/sms/{id}/status
 Authorization: Bearer <token>
+```
+
+Org list (same as `/history`; not the shared TalkSasa inbox):
+
+```http
+GET /api/v1/sms?page=0&size=20
+Authorization: Bearer <token>
+```
+
+Super Admin live TalkSasa inbox:
+
+```http
+GET /api/v1/admin/talksasa/sms?page=1&size=25
+GET /api/v1/admin/talksasa/sms/{uid}
 ```
 
 ### WhatsApp (TalkSasa)

@@ -68,7 +68,7 @@ public class WhatsAppController {
 
     @PostMapping("/{id}/resend")
     @Operation(summary = "Resend a single failed WhatsApp message")
-    public ApiResponse<SmsMessageResponse> resend(@PathVariable UUID id) {
+    public ApiResponse<SmsMessageResponse> resend(@PathVariable String id) {
         UUID orgId = SecurityUtils.requireOrganizationId();
         return ApiResponse.ok("WhatsApp resent", smsService.resend(orgId, id, MessageChannel.WHATSAPP));
     }
@@ -81,22 +81,28 @@ public class WhatsAppController {
     }
 
     @GetMapping("/history")
-    @Operation(summary = "WhatsApp send history")
+    @Operation(summary = "WhatsApp send history for this organization")
     public ApiResponse<Page<SmsMessageResponse>> history(@PageableDefault(size = 20) Pageable pageable) {
         UUID orgId = SecurityUtils.requireOrganizationId();
         return ApiResponse.ok(smsService.history(orgId, pageable, MessageChannel.WHATSAPP));
     }
 
+    @GetMapping
+    @Operation(summary = "WhatsApp send history for this organization (same as /history)")
+    public ApiResponse<Page<SmsMessageResponse>> list(@PageableDefault(size = 20) Pageable pageable) {
+        return history(pageable);
+    }
+
     @GetMapping("/{id}/status")
-    @Operation(summary = "Refresh delivery status using the Nova message id")
-    public ApiResponse<SmsMessageResponse> status(@PathVariable UUID id) {
+    @Operation(summary = "Refresh delivery status using the Nova message id or TalkSasa uid")
+    public ApiResponse<SmsMessageResponse> status(@PathVariable String id) {
         UUID orgId = SecurityUtils.requireOrganizationId();
         return ApiResponse.ok(smsService.refreshStatus(orgId, id, MessageChannel.WHATSAPP));
     }
 
     @GetMapping("/{id}")
-    @Operation(summary = "Get a WhatsApp message by Nova id")
-    public ApiResponse<SmsMessageResponse> get(@PathVariable UUID id) {
+    @Operation(summary = "Get a WhatsApp message by Nova id or TalkSasa uid for this organization")
+    public ApiResponse<SmsMessageResponse> get(@PathVariable String id) {
         UUID orgId = SecurityUtils.requireOrganizationId();
         return ApiResponse.ok(smsService.getForOrganization(orgId, id, MessageChannel.WHATSAPP));
     }

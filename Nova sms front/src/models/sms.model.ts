@@ -55,6 +55,7 @@ export interface SmsMessage {
   unitPrice?: number | null
   currency?: string | null
   provider?: string | null
+  providerMessageId?: string | null
   batchId: string | null
   scheduledAt: string | null
   createdAt: string
@@ -74,6 +75,38 @@ export interface BulkSmsResponse {
   skippedCount?: number | null
   failedCount?: number | null
   messages: SmsMessage[]
+}
+
+export interface TalkSasaSmsItem {
+  uid?: string | null
+  recipient?: string | null
+  senderId?: string | null
+  message?: string | null
+  status?: string | null
+  type?: string | null
+  direction?: string | null
+  cost?: string | null
+  smsCount?: number | null
+  createdAt?: string | null
+  novaMessage?: SmsMessage | null
+}
+
+export interface TalkSasaSmsList {
+  configured: boolean
+  reachable: boolean
+  errorMessage?: string | null
+  page?: number | null
+  perPage?: number | null
+  total?: number | null
+  lastPage?: number | null
+  items: TalkSasaSmsItem[]
+}
+
+export interface TalkSasaSmsView {
+  configured: boolean
+  reachable: boolean
+  errorMessage?: string | null
+  item?: TalkSasaSmsItem | null
 }
 
 export interface SmsHistoryFilters {

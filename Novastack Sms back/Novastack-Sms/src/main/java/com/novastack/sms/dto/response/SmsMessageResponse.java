@@ -30,6 +30,7 @@ public class SmsMessageResponse {
     private BigDecimal unitPrice;
     private String currency;
     private String provider;
+    private String providerMessageId;
     private UUID batchId;
     private Instant scheduledAt;
     private Instant createdAt;

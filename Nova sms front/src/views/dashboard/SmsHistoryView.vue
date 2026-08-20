@@ -154,7 +154,12 @@ async function resendSingle(row: SmsMessage) {
       ]"
     >
       <tr v-for="row in sms.history" :key="row.id" class="hover:bg-slate-50/70">
-        <td class="whitespace-nowrap px-4 py-3 font-mono text-xs">{{ row.recipient }}</td>
+        <td class="whitespace-nowrap px-4 py-3 font-mono text-xs">
+          <span class="block">{{ row.recipient }}</span>
+          <span v-if="row.providerMessageId" class="mt-0.5 block text-[11px] text-slate-400">
+            {{ row.providerMessageId }}
+          </span>
+        </td>
         <td class="whitespace-nowrap px-4 py-3">{{ row.senderId }}</td>
         <td class="max-w-sm px-4 py-3 text-slate-600">
           <p class="truncate">{{ row.content }}</p>
