@@ -1,7 +1,7 @@
 import api from './axios'
 import type { ApiResponse, Page, PageRequest } from '@/models/auth.model'
 import type {
-  PaymentInstructions,
+  MpesaReceiptLookup,
   StkPushResponse,
   TopupStatus,
   WalletBalance,
@@ -15,7 +15,16 @@ class WalletService {
   async getBalance(): Promise<WalletBalance> {
     const { data } = await api.get<ApiResponse<WalletBalance>>('/wallet/balance')
     if (!data.success || !data.data) throw new Error(data.message || 'Failed to load balance')
-    return data.data
+    const raw = data.data as WalletBalance & {
+      shortcode?: string
+      mpesaAccountRef?: string
+      account_number?: string
+    }
+    return {
+      ...raw,
+      paybill: raw.paybill || raw.shortcode,
+      accountNumber: raw.accountNumber || raw.mpesaAccountRef || raw.account_number,
+    }
   }
 
   async topUp(payload: WalletTopupRequest): Promise<StkPushResponse> {
@@ -42,6 +51,14 @@ class WalletService {
     return data.data
   }
 
+  async verifyReceipt(mpesaReceipt: string): Promise<MpesaReceiptLookup> {
+    const { data } = await api.post<ApiResponse<MpesaReceiptLookup>>('/wallet/topup/verify-receipt', {
+      mpesaReceipt: mpesaReceipt.trim(),
+    })
+    if (!data.success || !data.data) throw new Error(data.message || 'Failed to verify receipt')
+    return data.data
+  }
+
   async getTransactions(
     params: PageRequest & {
       organizationId?: string
@@ -54,18 +71,6 @@ class WalletService {
     })
     if (!data.success || !data.data) throw new Error(data.message || 'Failed to load transactions')
     return data.data
-  }
-
-  getPaymentInstructions(accountRef = 'YOUR-ACCOUNT'): PaymentInstructions {
-    return {
-      paybill: '522522',
-      accountNumber: accountRef,
-      businessName: 'Nova SMS Gateway',
-      notes: [
-        'Use your organization account reference as the M-Pesa account number.',
-        'Top-ups usually reflect within 1–2 minutes after confirmation.',
-      ],
-    }
   }
 }
 

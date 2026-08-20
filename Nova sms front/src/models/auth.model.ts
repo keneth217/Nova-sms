@@ -36,6 +36,7 @@ export interface AuthResponse {
   tokenType: 'Bearer'
   userId: string
   email: string
+  phone?: string | null
   fullName: string
   role: UserRole
   organizationId: string | null
@@ -71,6 +72,7 @@ export interface ResetPasswordRequest {
 export interface AuthUser {
   userId: string
   email: string
+  phone?: string | null
   fullName: string
   role: UserRole
   organizationId: string | null

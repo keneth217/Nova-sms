@@ -22,7 +22,7 @@ public class StkPushResponse {
     private String mpesaReceipt;
     private String resultCode;
     private String resultDesc;
-    /** True when Safaricom callback (or STK query) has finalized this transaction in our DB */
+    /** True when Safaricom STK callback has been applied to this transaction. */
     private boolean callbackReceived;
     private boolean walletCredited;
     private Instant updatedAt;

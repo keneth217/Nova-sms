@@ -13,7 +13,6 @@ import { useAuthStore } from '@/stores/auth.store'
 export const useWalletStore = defineStore('wallet', () => {
   const balance = ref<WalletBalance | null>(null)
   const transactions = ref<WalletTransaction[]>([])
-  const paymentInstructions = ref<PaymentInstructions | null>(null)
   const lastTopup = ref<StkPushResponse | null>(null)
   const loading = ref(false)
   const error = ref<string | null>(null)
@@ -22,6 +21,14 @@ export const useWalletStore = defineStore('wallet', () => {
   const smsCost = computed(() => balance.value?.smsCost ?? 1)
   const availableSms = computed(() => balance.value?.availableSms ?? Math.floor(formattedBalance.value / smsCost.value))
   const currency = computed(() => balance.value?.currency ?? 'KES')
+  const DEFAULT_PAYBILL = '5687394'
+
+  const paymentInstructions = computed<PaymentInstructions>(() => ({
+    paybill: balance.value?.paybill || DEFAULT_PAYBILL,
+    accountNumber: balance.value?.accountNumber || '',
+    businessName: balance.value?.businessName || 'Novastack SMS',
+    notes: [],
+  }))
 
   async function fetchBalance() {
     if (useAuthStore().isSuperAdmin) return
@@ -29,7 +36,6 @@ export const useWalletStore = defineStore('wallet', () => {
     error.value = null
     try {
       balance.value = await walletService.getBalance()
-      paymentInstructions.value = walletService.getPaymentInstructions()
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Failed to load wallet'
     } finally {
@@ -66,6 +72,16 @@ export const useWalletStore = defineStore('wallet', () => {
   }
 
   async function pollTopupStatus(transactionId: string) {
+    const status = await walletService.checkTopup(transactionId)
+    lastTopup.value = status
+    return status
+  }
+
+  async function verifyReceipt(mpesaReceipt: string) {
+    return walletService.verifyReceipt(mpesaReceipt)
+  }
+
+  async function recoverTopup(transactionId: string) {
     const status = await walletService.getTopupStatus(transactionId)
     lastTopup.value = status
     return status
@@ -86,5 +102,7 @@ export const useWalletStore = defineStore('wallet', () => {
     fetchTransactions,
     topUp,
     pollTopupStatus,
+    verifyReceipt,
+    recoverTopup,
   }
 })

@@ -50,8 +50,10 @@ export const developerNav: DocNavGroup[] = [
     items: [
       { id: 'send-sms', label: 'Send SMS', to: '/admin/developer/send-sms' },
       { id: 'bulk-sms', label: 'Bulk SMS', to: '/admin/developer/bulk-sms' },
+      { id: 'retry-failed', label: 'Retry failed SMS', to: '/admin/developer/retry-failed' },
       { id: 'status', label: 'SMS Status', to: '/admin/developer/status' },
       { id: 'history', label: 'SMS History', to: '/admin/developer/history' },
+      { id: 'wallet', label: 'Wallet', to: '/admin/developer/wallet' },
       { id: 'errors', label: 'Errors', to: '/admin/developer/errors' },
       { id: 'idempotency', label: 'Idempotency', to: '/admin/developer/idempotency' },
       { id: 'rate-limits', label: 'Rate Limits', to: '/admin/developer/rate-limits' },
@@ -80,6 +82,20 @@ export const developerNav: DocNavGroup[] = [
     items: [{ id: 'provider', label: 'TalkSasa (internal)', to: '/admin/developer/provider' }],
   },
 ]
+
+export function publicDocPath(id: string): string {
+  return id === 'overview' ? '/developers' : `/developers/${id}`
+}
+
+export const publicDeveloperNav: DocNavGroup[] = developerNav
+  .filter((group) => group.label !== 'Manage' && group.label !== 'Internal')
+  .map((group) => ({
+    label: group.label,
+    items: group.items.map((item) => ({
+      ...item,
+      to: publicDocPath(item.id),
+    })),
+  }))
 
 export function buildDeveloperPages(origin: string): Record<string, DocPage> {
   const o = origin.replace(/\/$/, '')
@@ -120,7 +136,7 @@ export function buildDeveloperPages(origin: string): Record<string, DocPage> {
         },
         {
           type: 'p',
-          text: 'Use this API from Mwalimu Scheme, Chamaplus, Nova POS, SACCO and school systems, other NovaStack apps, and third-party backends. Dashboard users keep using email and password. They do not need an API key.',
+          text: 'Use this API from Mwalimu Scheme, Chamaplus, Nova POS, SACCO and school systems, other NovaStack apps, and third-party backends. Dashboard users keep using email and password. They do not need an API key. With WALLET_READ and WALLET_TOPUP, those apps can show SMS balance and accept M-Pesa top-ups on their own site.',
         },
         { type: 'h2', text: 'Base URL' },
         {
@@ -154,10 +170,18 @@ export function buildDeveloperPages(origin: string): Record<string, DocPage> {
           rows: [
             ['POST', '/api/v1/sms/send', 'SMS_SEND'],
             ['POST', '/api/v1/sms/bulk', 'SMS_BULK'],
+            ['GET', '/api/v1/sms/batches/{batchId}', 'SMS_STATUS'],
+            ['POST', '/api/v1/sms/batches/{batchId}/resend-failed', 'SMS_BULK'],
+            ['POST', '/api/v1/sms/{id}/resend', 'SMS_SEND'],
             ['POST', '/api/v1/sms/schedule', 'SMS_BULK'],
             ['GET', '/api/v1/sms/{id}', 'SMS_STATUS'],
             ['GET', '/api/v1/sms/{id}/status', 'SMS_STATUS'],
             ['GET', '/api/v1/sms/history', 'SMS_HISTORY'],
+            ['GET', '/api/v1/wallet/balance', 'WALLET_READ'],
+            ['GET', '/api/v1/wallet/transactions', 'WALLET_READ'],
+            ['POST', '/api/v1/wallet/topup', 'WALLET_TOPUP'],
+            ['GET', '/api/v1/wallet/topup/{id}', 'WALLET_TOPUP'],
+            ['POST', '/api/v1/wallet/topup/{id}/check', 'WALLET_TOPUP'],
           ],
         },
         { type: 'h2', text: 'Security' },
@@ -230,8 +254,9 @@ Nova SMS API`,
             'API keys are separate from dashboard passwords.',
             'Nova stores a SHA-256 hash. The full key is shown only at create or rotate.',
             'Revoked keys stop working immediately.',
-            'Scoped live keys may only call /api/v1/sms/**.',
+            'Scoped live keys may call /api/v1/sms/** and, when granted, /api/v1/wallet/**.',
             'Default permissions if none are selected: SMS_SEND, SMS_BULK, SMS_STATUS.',
+            'Grant WALLET_READ and WALLET_TOPUP so partner apps can show balance and top up on their own site.',
           ],
         },
         { type: 'h2', text: 'Create an API client' },
@@ -321,6 +346,12 @@ Nova SMS API`,
   }
 }`,
         },
+        { type: 'h2', text: 'Resend a failed SMS' },
+        { type: 'http', method: 'POST', path: '/api/v1/sms/{id}/resend' },
+        {
+          type: 'p',
+          text: 'Nova does not retry FAILED messages automatically. POST /sms/{id}/resend creates a new message. Use a new Idempotency-Key. For batches, see Retry failed SMS.',
+        },
       ],
     },
     'bulk-sms': {
@@ -371,6 +402,141 @@ Nova SMS API`,
   }
 }`,
         },
+        { type: 'h2', text: 'Resend failed recipients' },
+        {
+          type: 'p',
+          text: 'FAILED messages are not retried automatically. Inspect the batch with GET /api/v1/sms/batches/{batchId}, then POST /api/v1/sms/batches/{batchId}/resend-failed. That creates a new batch of failed recipients only. Full client guide: Retry failed SMS.',
+        },
+      ],
+    },
+    'retry-failed': {
+      id: 'retry-failed',
+      title: 'Retry failed SMS',
+      description: 'How to resend FAILED messages. Nova does not retry them automatically.',
+      blocks: [
+        {
+          type: 'p',
+          text: 'A FAILED, REJECTED, or CANCELLED message is finished. Nova does not queue it again. Submit a new send. Original rows stay in history so you keep an audit trail.',
+        },
+        {
+          type: 'warn',
+          text: 'Do not reuse the original Idempotency-Key. A new send or resend needs a new key. Reusing the bulk key replays the original batch, including numbers that already SENT.',
+        },
+        { type: 'h2', text: 'Two kinds of failure' },
+        {
+          type: 'table',
+          headers: ['What happened', 'HTTP', 'Wallet', 'What you do'],
+          rows: [
+            [
+              'Organization Nova SMS wallet too low',
+              '402',
+              'Nothing deducted. Nothing queued.',
+              'Top up the org wallet. POST /sms/send or /sms/bulk again with a new Idempotency-Key.',
+            ],
+            [
+              'Provider rejected the send (including no remaining units)',
+              '200 with data.status FAILED',
+              'Debited then refunded',
+              'After the provider is funded, resend. See endpoints below.',
+            ],
+          ],
+        },
+        {
+          type: 'p',
+          text: 'HTTP 402 envelope: message "Insufficient wallet balance". data includes required, available, and currency. Do not treat this as a stored FAILED SMS.',
+        },
+        {
+          type: 'p',
+          text: 'Provider unit failures often set failureReason to "SMS provider has no remaining units. Please contact support." Contact Nova SMS support. Then resend.',
+        },
+        { type: 'h2', text: 'Inspect a batch' },
+        { type: 'http', method: 'GET', path: '/api/v1/sms/batches/{batchId}' },
+        {
+          type: 'p',
+          text: 'Permission SMS_STATUS. Returns every recipient in that batch. data.failedCount is how many are FAILED, REJECTED, or CANCELLED. Read data.messages[].status. SENT, DELIVERED, ACCEPTED, and PENDING must not be sent again.',
+        },
+        {
+          type: 'code',
+          language: 'bash',
+          code: `curl -X GET "${o}/api/v1/sms/batches/\${BATCH_ID}" \\
+  -H "X-API-Key: \${NOVA_SMS_API_KEY}" \\
+  -H "Accept: application/json"`,
+        },
+        {
+          type: 'code',
+          language: 'json',
+          code: `{
+  "success": true,
+  "message": "OK",
+  "data": {
+    "batchId": "b0b0b0b0-1111-2222-3333-444444444444",
+    "queuedCount": 100,
+    "recipientCount": 100,
+    "failedCount": 7,
+    "status": "COMPLETED",
+    "messages": []
+  }
+}`,
+        },
+        { type: 'h2', text: 'Resend failed recipients in a batch' },
+        { type: 'http', method: 'POST', path: '/api/v1/sms/batches/{batchId}/resend-failed' },
+        {
+          type: 'p',
+          text: 'Permission SMS_BULK. Creates a new batch for failed recipients only. SENT and DELIVERED numbers are skipped. Wallet is checked again (HTTP 402 if still short). Original FAILED rows are not changed to PENDING.',
+        },
+        {
+          type: 'code',
+          language: 'bash',
+          code: `curl -X POST "${o}/api/v1/sms/batches/\${BATCH_ID}/resend-failed" \\
+  -H "X-API-Key: \${NOVA_SMS_API_KEY}" \\
+  -H "Idempotency-Key: resend-\${BATCH_ID}-\$(date +%s)" \\
+  -H "Accept: application/json"`,
+        },
+        {
+          type: 'code',
+          language: 'json',
+          code: `{
+  "success": true,
+  "message": "Failed SMS resent",
+  "data": {
+    "batchId": "c1c1c1c1-1111-2222-3333-555555555555",
+    "sourceBatchId": "b0b0b0b0-1111-2222-3333-444444444444",
+    "queuedCount": 7,
+    "resentCount": 7,
+    "skippedCount": 93,
+    "status": "PROCESSING",
+    "messages": []
+  }
+}`,
+        },
+        {
+          type: 'note',
+          text: 'If 100 were sent and 7 failed, this sends 7, not 100. Attempt 1 stays FAILED and refunded. Attempt 2 is a new charge if the provider accepts it.',
+        },
+        { type: 'h2', text: 'Resend one failed SMS' },
+        { type: 'http', method: 'POST', path: '/api/v1/sms/{id}/resend' },
+        {
+          type: 'p',
+          text: 'Permission SMS_SEND. {id} is data.id from the original send. Only FAILED, REJECTED, or CANCELLED messages can be resent. Creates a new message for the same recipient and copy. HTTP 400 if the message is not failed.',
+        },
+        {
+          type: 'code',
+          language: 'bash',
+          code: `curl -X POST "${o}/api/v1/sms/\${MESSAGE_ID}/resend" \\
+  -H "X-API-Key: \${NOVA_SMS_API_KEY}" \\
+  -H "Idempotency-Key: resend-\${MESSAGE_ID}-\$(date +%s)" \\
+  -H "Accept: application/json"`,
+        },
+        {
+          type: 'table',
+          headers: ['HTTP', 'When'],
+          rows: [
+            ['200', 'New SMS created and sent'],
+            ['400', 'No failed recipients, or the message is not FAILED/REJECTED/CANCELLED'],
+            ['402', 'Organization wallet cannot cover the new send'],
+            ['404', 'Unknown batch or message id for this organization'],
+          ],
+        },
       ],
     },
     status: {
@@ -389,6 +555,10 @@ Nova SMS API`,
           text: `PENDING → ACCEPTED / SENT / DELIVERED
 SCHEDULED (until dispatch)
 FAILED / REJECTED / CANCELLED (refunded)`,
+        },
+        {
+          type: 'p',
+          text: 'FAILED is terminal. Nova does not auto-retry it. Resend with POST /api/v1/sms/{id}/resend or POST /api/v1/sms/batches/{batchId}/resend-failed. See Retry failed SMS.',
         },
         {
           type: 'p',
@@ -422,6 +592,207 @@ FAILED / REJECTED / CANCELLED (refunded)`,
         },
       ],
     },
+    wallet: {
+      id: 'wallet',
+      title: 'Wallet',
+      description:
+        'Show organization balance and accept M-Pesa STK top-ups from your own site. Permission WALLET_READ / WALLET_TOPUP.',
+      blocks: [
+        {
+          type: 'p',
+          text: 'Partner apps (Mwalimu, Chamaplus, Nova POS, and others) can display SMS credit and let users fund the organization wallet without signing into the Nova SMS portal. Call these endpoints from your backend. Never put the live key in browser JavaScript.',
+        },
+        {
+          type: 'pre',
+          text: `User on your site
+   ↓
+Your backend
+   ↓
+Nova SMS wallet API
+   ↓
+M-Pesa STK Push`,
+        },
+        { type: 'h2', text: 'Permissions' },
+        {
+          type: 'ul',
+          items: [
+            'WALLET_READ — GET /api/v1/wallet/balance and GET /api/v1/wallet/transactions.',
+            'WALLET_TOPUP — POST /api/v1/wallet/topup, GET /api/v1/wallet/topup/{id}, POST /api/v1/wallet/topup/{id}/check.',
+            'Enable them on the API client (Developer → API Clients → Permissions). Existing keys can be updated without rotating.',
+            'The wallet is the organization wallet. All API clients for that org share the same balance.',
+          ],
+        },
+        { type: 'h2', text: 'Balance' },
+        { type: 'http', method: 'GET', path: '/api/v1/wallet/balance' },
+        {
+          type: 'code',
+          language: 'bash',
+          code: `curl -X GET "${o}/api/v1/wallet/balance" \\
+  -H "X-API-Key: \${NOVA_SMS_API_KEY}" \\
+  -H "Accept: application/json"`,
+        },
+        {
+          type: 'code',
+          language: 'json',
+          code: `{
+  "success": true,
+  "message": "OK",
+  "data": {
+    "walletId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "organizationId": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+    "balance": 1500.00,
+    "currency": "KES",
+    "smsCost": 1.00,
+    "availableSms": 1500
+  }
+}`,
+        },
+        { type: 'h2', text: 'Top up (M-Pesa STK)' },
+        { type: 'http', method: 'POST', path: '/api/v1/wallet/topup' },
+        {
+          type: 'table',
+          headers: ['Field', 'Required', 'Type', 'Description'],
+          rows: [
+            ['amount', 'Yes', 'number', 'KES. Minimum 1.00'],
+            ['phoneNumber', 'Yes', 'string', 'M-Pesa phone that receives the STK prompt. 07…, 254…, or +254…'],
+          ],
+        },
+        {
+          type: 'code',
+          language: 'bash',
+          code: `curl -X POST "${o}/api/v1/wallet/topup" \\
+  -H "X-API-Key: \${NOVA_SMS_API_KEY}" \\
+  -H "Content-Type: application/json" \\
+  -H "Accept: application/json" \\
+  -d '{
+    "amount": 500,
+    "phoneNumber": "254712345678"
+  }'`,
+        },
+        {
+          type: 'p',
+          text: 'Nova SMS is the source of truth. Do not mark the payment successful from the M-Pesa PIN screen. Read data.transactionId, then poll Nova SMS until status is COMPLETED and walletCredited is true.',
+        },
+        {
+          type: 'code',
+          language: 'json',
+          code: `{
+  "success": true,
+  "message": "STK Push sent. Enter M-Pesa PIN on your phone.",
+  "data": {
+    "transactionId": "c3d4e5f6-a7b8-9012-cdef-123456789012",
+    "checkoutRequestId": "ws_CO_19082026104512345",
+    "status": "PENDING",
+    "amount": 500.00,
+    "phoneNumber": "254712345678",
+    "callbackReceived": false,
+    "walletCredited": false
+  }
+}`,
+        },
+        { type: 'h3', text: 'Polling rules' },
+        {
+          type: 'ol',
+          items: [
+            'Read data.transactionId from the initial top-up response.',
+            'Wait approximately 5 seconds before the first status check.',
+            'Call POST /api/v1/wallet/topup/{transactionId}/check every 3–5 seconds.',
+            'Continue polling while status is PENDING.',
+            '"The transaction is still under processing" is PENDING, not FAILED.',
+            'Stop polling when status is COMPLETED and walletCredited=true.',
+            'Stop polling when Nova reports a definitive FAILED status.',
+            'Never create another STK Push while the existing transaction is still PENDING.',
+            'GET /api/v1/wallet/topup/{id} may be used to recover/read the transaction, but it does not query Safaricom.',
+            'After successful completion, call GET /api/v1/wallet/balance to refresh the organization\'s SMS balance.',
+          ],
+        },
+        { type: 'http', method: 'POST', path: '/api/v1/wallet/topup/{transactionId}/check' },
+        { type: 'http', method: 'GET', path: '/api/v1/wallet/topup/{transactionId}' },
+        {
+          type: 'p',
+          text: 'POST …/check reads the database and, if still PENDING, queries Safaricom and updates the row. GET …/{id} only reads the stored row.',
+        },
+        {
+          type: 'code',
+          language: 'bash',
+          code: `curl -X POST "${o}/api/v1/wallet/topup/\${TRANSACTION_ID}/check" \\
+  -H "X-API-Key: \${NOVA_SMS_API_KEY}" \\
+  -H "Accept: application/json"`,
+        },
+        {
+          type: 'h3',
+          text: 'Statuses',
+        },
+        {
+          type: 'table',
+          headers: ['status', 'Meaning', 'What your app should do'],
+          rows: [
+            ['PENDING', 'STK sent, or Safaricom still processing (including “The transaction is still under processing”). Not a failure.', 'Keep polling. Do not treat this as FAILED.'],
+            ['COMPLETED', 'Payment succeeded. Wallet credited once.', 'Stop polling only when walletCredited is also true. Then GET /api/v1/wallet/balance. Use mpesaReceipt.'],
+            ['FAILED', 'Definitive failure: user cancelled, insufficient funds, wrong PIN, or similar.', 'Stop polling. Show failure. Do not credit the UI.'],
+          ],
+        },
+        {
+          type: 'table',
+          headers: ['Field', 'Meaning'],
+          rows: [
+            ['walletCredited', 'true after Nova SMS has credited the organization wallet exactly once. This is the success flag.'],
+            ['callbackReceived', 'true after Safaricom’s STK callback was applied. A successful STK query can credit the wallet before the callback arrives, so this can still be false when walletCredited is true.'],
+            ['mpesaReceipt', 'M-Pesa receipt (for example UHJA53YW7O) once Safaricom confirms.'],
+            ['resultDesc', 'Latest Safaricom description. “Still under processing” means PENDING, not FAILED.'],
+          ],
+        },
+        {
+          type: 'note',
+          text: 'Status never moves backwards. COMPLETED is never overwritten with PENDING or FAILED. Keep polling PENDING; Nova SMS applies the Safaricom callback even if an earlier check was still processing.',
+        },
+        {
+          type: 'code',
+          language: 'json',
+          code: `{
+  "success": true,
+  "message": "OK",
+  "data": {
+    "transactionId": "c3d4e5f6-a7b8-9012-cdef-123456789012",
+    "checkoutRequestId": "ws_CO_19082026104512345",
+    "status": "COMPLETED",
+    "amount": 500.00,
+    "phoneNumber": "254712345678",
+    "mpesaReceipt": "UHJA53YW7O",
+    "callbackReceived": true,
+    "walletCredited": true
+  }
+}`,
+        },
+        {
+          type: 'code',
+          language: 'json',
+          code: `{
+  "success": true,
+  "message": "Still pending — waiting for Safaricom callback or user PIN entry",
+  "data": {
+    "transactionId": "c3d4e5f6-a7b8-9012-cdef-123456789012",
+    "status": "PENDING",
+    "amount": 500.00,
+    "phoneNumber": "254712345678",
+    "resultDesc": "The transaction is still under processing",
+    "callbackReceived": false,
+    "walletCredited": false
+  }
+}`,
+        },
+        { type: 'h2', text: 'Transactions' },
+        { type: 'http', method: 'GET', path: '/api/v1/wallet/transactions?page=0&size=20' },
+        {
+          type: 'p',
+          text: 'Optional filters: type=TOPUP|SMS_DEBIT|REFUND|ADJUSTMENT and status=PENDING|COMPLETED|FAILED. data is a Spring Page.',
+        },
+        {
+          type: 'warn',
+          text: 'Never call Nova SMS from the browser with a live key. Your site UI should call your backend; your backend calls Nova SMS.',
+        },
+      ],
+    },
     errors: {
       id: 'errors',
       title: 'Errors',
@@ -437,8 +808,10 @@ FAILED / REJECTED / CANCELLED (refunded)`,
           rows: [
             ['401', 'Missing key / no JWT', 'Session expired. Please sign in again.'],
             ['401', 'Bad, revoked, or expired key', 'Invalid API key.'],
-            ['402', 'Wallet too low', 'Insufficient wallet balance'],
-            ['403', 'Scoped key off /sms', 'This API key cannot access that resource'],
+            ['402', 'Wallet too low before send', 'Insufficient wallet balance'],
+            ['400', 'Resend of a non-failed message', 'Only failed messages can be resent'],
+            ['400', 'Batch resend with nothing failed', 'No failed messages to resend'],
+            ['403', 'Scoped key off /sms and /wallet', 'This API key cannot access that resource'],
             ['403', 'Missing permission', 'API key is missing permission SMS_HISTORY'],
             ['400', 'Invalid phone', "Invalid phone number '…'. Use 07…, 01…, 254…, or +254…"],
             ['409', 'Idempotency body mismatch', 'Idempotency-Key was reused with a different request body'],
@@ -449,7 +822,7 @@ FAILED / REJECTED / CANCELLED (refunded)`,
         },
         {
           type: 'note',
-          text: 'Invalid phones return 400, not 422. Provider send failures often return HTTP 200 with data.status FAILED and a refund.',
+          text: 'Invalid phones return 400, not 422. HTTP 402 means nothing was queued or deducted — top up, then send again. Provider send failures often return HTTP 200 with data.status FAILED, a refund, and failureReason. Those are not retried automatically. See Retry failed SMS.',
         },
       ],
     },
@@ -458,7 +831,7 @@ FAILED / REJECTED / CANCELLED (refunded)`,
       title: 'Idempotency',
       description: 'Prevent duplicate SMS on retries (payments, OTPs, callbacks).',
       blocks: [
-        { type: 'p', text: 'Send Idempotency-Key on POST /sms/send and POST /sms/bulk for scoped API clients.' },
+        { type: 'p', text: 'Send Idempotency-Key on POST /sms/send, POST /sms/bulk, and POST /sms/batches/{batchId}/resend-failed for scoped API clients. Resend must use a new key — reusing the original bulk key replays the original batch.' },
         {
           type: 'code',
           language: 'bash',

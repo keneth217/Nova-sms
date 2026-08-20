@@ -118,23 +118,153 @@ public class MpesaDarajaClient {
                     .retrieve()
                     .body(String.class);
 
-            JsonNode root = objectMapper.readTree(responseBody);
-            return new StkQueryResult(
-                    root.path("ResponseCode").asText(null),
-                    root.path("ResponseDescription").asText(null),
-                    root.path("MerchantRequestID").asText(null),
-                    root.path("CheckoutRequestID").asText(checkoutRequestId),
-                    root.path("ResultCode").asText(null),
-                    root.path("ResultDesc").asText(null),
-                    responseBody
-            );
+            return parseStkQueryResponse(checkoutRequestId, responseBody);
         } catch (RestClientResponseException ex) {
-            log.error("Daraja STK query HTTP error: {}", ex.getResponseBodyAsString());
-            throw new ApiException("M-Pesa STK query failed: " + ex.getResponseBodyAsString(), HttpStatus.BAD_GATEWAY);
+            String errorBody = ex.getResponseBodyAsString();
+            log.warn("Daraja STK query HTTP error: {}", errorBody);
+            StkQueryResult parsed = parseStkQueryResponse(checkoutRequestId, errorBody);
+            if (parsed.hasProcessingDescriptor()) {
+                return parsed;
+            }
+            throw new ApiException("M-Pesa STK query failed: " + errorBody, HttpStatus.BAD_GATEWAY);
+        } catch (ApiException ex) {
+            throw ex;
         } catch (Exception ex) {
             log.error("Daraja STK query error: {}", ex.getMessage(), ex);
             throw new ApiException("M-Pesa STK query failed: " + ex.getMessage(), HttpStatus.BAD_GATEWAY);
         }
+    }
+
+    StkQueryResult parseStkQueryResponse(String checkoutRequestId, String responseBody) {
+        if (responseBody == null || responseBody.isBlank()) {
+            return new StkQueryResult(null, null, null, checkoutRequestId, null, null, responseBody);
+        }
+        try {
+            JsonNode root = objectMapper.readTree(responseBody);
+            String resultCode = firstText(root, "ResultCode", "errorCode");
+            String resultDesc = firstText(root, "ResultDesc", "errorMessage", "ResponseDescription");
+            return new StkQueryResult(
+                    firstText(root, "ResponseCode", "errorCode"),
+                    firstText(root, "ResponseDescription", "errorMessage"),
+                    textOrNull(root, "MerchantRequestID"),
+                    firstText(root, "CheckoutRequestID") != null
+                            ? firstText(root, "CheckoutRequestID")
+                            : checkoutRequestId,
+                    resultCode,
+                    resultDesc,
+                    responseBody
+            );
+        } catch (Exception ex) {
+            return new StkQueryResult(null, null, null, checkoutRequestId, null, responseBody, responseBody);
+        }
+    }
+
+    /**
+     * Register C2B v2 validation/confirmation URLs for the Paybill shortcode.
+     * Safaricom rejects callback URLs that contain the word "mpesa".
+     */
+    public C2bRegisterResult registerC2bUrls(String confirmationUrl, String validationUrl) {
+        AppProperties.Mpesa mpesa = appProperties.getMpesa();
+        validateConfig(mpesa);
+
+        Map<String, Object> body = new java.util.LinkedHashMap<>();
+        body.put("ShortCode", mpesa.getShortcode());
+        body.put("ResponseType", "Completed");
+        body.put("ConfirmationURL", confirmationUrl);
+        body.put("ValidationURL", validationUrl);
+
+        try {
+            return postRegisterUrl(body, false);
+        } catch (RestClientResponseException ex) {
+            String errorBody = ex.getResponseBodyAsString();
+            if (C2bDarajaErrorMapper.invalidAccessToken(errorBody)) {
+                cachedToken.set(null);
+                try {
+                    return postRegisterUrl(body, true);
+                } catch (RestClientResponseException retryEx) {
+                    return registerFailure(retryEx.getStatusCode().value(), retryEx.getResponseBodyAsString());
+                } catch (Exception retryEx) {
+                    throw new ApiException("C2B URL registration failed: " + retryEx.getMessage(),
+                            HttpStatus.BAD_GATEWAY);
+                }
+            }
+            return registerFailure(ex.getStatusCode().value(), errorBody);
+        } catch (ApiException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new ApiException("C2B URL registration failed: " + ex.getMessage(), HttpStatus.BAD_GATEWAY);
+        }
+    }
+
+    private C2bRegisterResult postRegisterUrl(Map<String, Object> body, boolean retried) {
+        String responseBody = restClientBuilder.build()
+                .post()
+                .uri(appProperties.getMpesa().getBaseUrl() + "/mpesa/c2b/v2/registerurl")
+                .contentType(MediaType.APPLICATION_JSON)
+                .header("Authorization", "Bearer " + getAccessToken())
+                .body(body)
+                .retrieve()
+                .body(String.class);
+        log.info("C2B v2 registerurl response retried={}: {}", retried, responseBody);
+        String code = extractDarajaCode(responseBody);
+        String desc = extractDarajaDescription(responseBody);
+        boolean ok = "0".equals(code) || (desc != null && desc.equalsIgnoreCase("Success"));
+        return new C2bRegisterResult(ok, false, code, desc != null ? desc : "Success", responseBody);
+    }
+
+    private C2bRegisterResult registerFailure(int httpStatus, String errorBody) {
+        if (C2bDarajaErrorMapper.alreadyRegistered(errorBody)) {
+            log.info("C2B v2 URLs already registered: {}", errorBody);
+            return new C2bRegisterResult(true, true, "500.003.1001",
+                    C2bDarajaErrorMapper.message(httpStatus, errorBody), errorBody);
+        }
+        String mapped = C2bDarajaErrorMapper.message(httpStatus, errorBody);
+        log.error("C2B v2 registerurl HTTP {}: {}", httpStatus, errorBody);
+        throw new ApiException(mapped, HttpStatus.BAD_GATEWAY);
+    }
+
+    private String extractDarajaCode(String body) {
+        if (body == null || body.isBlank()) {
+            return null;
+        }
+        try {
+            JsonNode root = objectMapper.readTree(body);
+            String code = firstText(root, "ResponseCode", "errorCode");
+            return code;
+        } catch (Exception ex) {
+            return null;
+        }
+    }
+
+    private String extractDarajaDescription(String body) {
+        if (body == null || body.isBlank()) {
+            return null;
+        }
+        try {
+            JsonNode root = objectMapper.readTree(body);
+            return firstText(root, "ResponseDescription", "errorMessage");
+        } catch (Exception ex) {
+            return body;
+        }
+    }
+
+    private String firstText(JsonNode root, String... fields) {
+        for (String field : fields) {
+            String value = textOrNull(root, field);
+            if (value != null) {
+                return value;
+            }
+        }
+        return null;
+    }
+
+    private String textOrNull(JsonNode root, String field) {
+        JsonNode node = root.path(field);
+        if (node.isMissingNode() || node.isNull()) {
+            return null;
+        }
+        String value = node.asText(null);
+        return value == null || value.isBlank() || "null".equalsIgnoreCase(value) ? null : value;
     }
 
     private String buildPassword(AppProperties.Mpesa mpesa, String timestamp) {
@@ -197,6 +327,15 @@ public class MpesaDarajaClient {
         return value.length() <= max ? value : value.substring(0, max);
     }
 
+    public record C2bRegisterResult(
+            boolean success,
+            boolean alreadyRegistered,
+            String errorCode,
+            String message,
+            String rawResponse
+    ) {
+    }
+
     public record StkPushResult(
             String checkoutRequestId,
             String merchantRequestId,
@@ -218,12 +357,40 @@ public class MpesaDarajaClient {
             return "0".equals(resultCode);
         }
 
-        public boolean isTerminalFailure() {
-            if (resultCode == null || resultCode.isBlank() || "0".equals(resultCode)) {
+        /**
+         * Safaricom has not finished the STK request yet. This is not a payment failure.
+         * Typical text: "The transaction is still under processing".
+         */
+        public boolean isStillProcessing() {
+            if (isPaymentSuccessful()) {
                 return false;
             }
-            String desc = resultDesc != null ? resultDesc.toLowerCase() : "";
-            return !desc.contains("being processed");
+            if (hasProcessingDescriptor()) {
+                return true;
+            }
+            return resultCode == null || resultCode.isBlank();
+        }
+
+        /** True only when Safaricom explicitly said the STK request is still in flight. */
+        public boolean hasProcessingDescriptor() {
+            String blob = ((responseCode == null ? "" : responseCode) + " "
+                    + (responseDescription == null ? "" : responseDescription) + " "
+                    + (resultCode == null ? "" : resultCode) + " "
+                    + (resultDesc == null ? "" : resultDesc)).toLowerCase();
+            if (blob.contains("under processing")
+                    || blob.contains("being processed")
+                    || blob.contains("still processing")
+                    || blob.contains("request processing")
+                    || blob.contains("in progress")) {
+                return true;
+            }
+            return "4999".equals(resultCode)
+                    || "500.001.1001".equals(resultCode)
+                    || "500.001.1001".equals(responseCode);
+        }
+
+        public boolean isTerminalFailure() {
+            return !isPaymentSuccessful() && !isStillProcessing();
         }
     }
 

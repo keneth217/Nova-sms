@@ -56,7 +56,7 @@ async function onSubmit() {
       <div
         class="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm shadow-slate-900/5 sm:p-8"
       >
-        <h2 class="text-xl font-semibold text-slate-900">Sign in</h2>
+        <h1 class="text-xl font-semibold text-slate-900">Sign in</h1>
         <p class="mt-1 text-sm text-slate-500">Use your email or phone number</p>
 
         <div

@@ -24,7 +24,8 @@ public class OpenApiConfig {
                         .title("Nova SMS API")
                         .description("""
                                 Multi-tenant SMS SaaS and developer gateway. External applications authenticate \
-                                with `X-API-Key` and call `/api/v1/sms/**`. Nova SMS abstracts the upstream SMS \
+                                with `X-API-Key` and call `/api/v1/sms/**` plus `/api/v1/wallet/**` when granted \
+                                `WALLET_READ` / `WALLET_TOPUP`. Nova SMS abstracts the upstream SMS \
                                 provider; never send TalkSasa tokens to this API. Optional `Idempotency-Key` \
                                 on POST /sms/send and POST /sms/bulk prevents duplicate sends.""")
                         .version("1.0.0")

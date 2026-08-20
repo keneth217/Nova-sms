@@ -3,6 +3,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { apiClientService } from '@/api/api-client.service'
 import { organizationService } from '@/api/organization.service'
 import type { ApiClient, ApiPermission } from '@/models/api-client.model'
+import { API_PERMISSIONS } from '@/models/api-client.model'
 import type { AdminOrganization } from '@/models/organization.model'
 import { useAuthStore } from '@/stores/auth.store'
 import PageHeader from '@/components/common/PageHeader.vue'
@@ -16,7 +17,7 @@ import DataTable from '@/components/tables/DataTable.vue'
 import EntityStatusBadge from '@/components/common/EntityStatusBadge.vue'
 import { formatDate } from '@/utils/format'
 
-const ALL_PERMISSIONS: ApiPermission[] = ['SMS_SEND', 'SMS_BULK', 'SMS_STATUS', 'SMS_HISTORY']
+const DEFAULT_PERMISSIONS: ApiPermission[] = ['SMS_SEND', 'SMS_BULK', 'SMS_STATUS']
 
 const auth = useAuthStore()
 const isAdmin = computed(() => auth.isSuperAdmin)
@@ -26,13 +27,14 @@ const loading = ref(false)
 const message = ref('')
 const revealedKey = ref('')
 const showCreate = ref(false)
+const editingClient = ref<ApiClient | null>(null)
 const saving = ref(false)
 const formError = ref('')
 const form = reactive({
   organizationId: '',
   name: '',
   rateLimitPerMinute: 100,
-  permissions: ['SMS_SEND', 'SMS_BULK', 'SMS_STATUS'] as ApiPermission[],
+  permissions: [...DEFAULT_PERMISSIONS] as ApiPermission[],
 })
 
 async function load() {
@@ -65,25 +67,50 @@ function togglePermission(permission: ApiPermission) {
 
 function openCreate() {
   formError.value = ''
+  editingClient.value = null
   form.name = ''
   form.rateLimitPerMinute = 100
-  form.permissions = ['SMS_SEND', 'SMS_BULK', 'SMS_STATUS']
+  form.permissions = [...DEFAULT_PERMISSIONS]
   form.organizationId = organizations.value[0]?.id || ''
   showCreate.value = true
 }
 
-async function createClient() {
+function openEdit(client: ApiClient) {
+  formError.value = ''
+  editingClient.value = client
+  form.name = client.name
+  form.rateLimitPerMinute = client.rateLimitPerMinute
+  form.permissions = [...client.permissions]
+  form.organizationId = client.organizationId
+  showCreate.value = true
+}
+
+async function saveClient() {
   formError.value = ''
   if (!form.name.trim()) {
     formError.value = 'Name is required.'
     return
   }
-  if (isAdmin.value && !form.organizationId) {
+  if (!editingClient.value && isAdmin.value && !form.organizationId) {
     formError.value = 'Select an organization.'
     return
   }
   saving.value = true
   try {
+    if (editingClient.value) {
+      const payload = {
+        name: form.name.trim(),
+        rateLimitPerMinute: form.rateLimitPerMinute,
+        permissions: form.permissions,
+      }
+      if (isAdmin.value) await apiClientService.updateAdmin(editingClient.value.id, payload)
+      else await apiClientService.updateMine(editingClient.value.id, payload)
+      message.value = `${form.name.trim()} updated. Wallet permissions apply on the next API request.`
+      showCreate.value = false
+      editingClient.value = null
+      await load()
+      return
+    }
     const payload = {
       name: form.name.trim(),
       rateLimitPerMinute: form.rateLimitPerMinute,
@@ -98,7 +125,7 @@ async function createClient() {
     message.value = 'API client created. Copy the key now — it will not be shown again.'
     await load()
   } catch (e) {
-    formError.value = e instanceof Error ? e.message : 'Failed to create API client'
+    formError.value = e instanceof Error ? e.message : 'Failed to save API client'
   } finally {
     saving.value = false
   }
@@ -145,7 +172,7 @@ async function revoke(client: ApiClient) {
   <div>
     <PageHeader
       title="API clients"
-      description="Issue Nova SMS keys for your own apps. Keys are hashed; TalkSasa stays on the server."
+      description="Issue Nova SMS keys for your own apps. Grant WALLET_READ and WALLET_TOPUP so those apps can show balance and accept M-Pesa top-ups on their own site."
     >
       <template #actions>
         <AppButton @click="openCreate">New API client</AppButton>
@@ -209,6 +236,14 @@ async function revoke(client: ApiClient) {
               v-if="client.status !== 'REVOKED'"
               size="sm"
               variant="ghost"
+              @click="openEdit(client)"
+            >
+              Permissions
+            </AppButton>
+            <AppButton
+              v-if="client.status !== 'REVOKED'"
+              size="sm"
+              variant="ghost"
               @click="rotate(client)"
             >
               Rotate
@@ -226,9 +261,13 @@ async function revoke(client: ApiClient) {
       </tr>
     </DataTable>
 
-    <AppModal :open="showCreate" title="Create API client" @close="showCreate = false">
-      <form id="create-api-client" class="space-y-4" @submit.prevent="createClient">
-        <FormField v-if="isAdmin" label="Organization" required>
+    <AppModal
+      :open="showCreate"
+      :title="editingClient ? `Edit ${editingClient.name}` : 'Create API client'"
+      @close="showCreate = false"
+    >
+      <form id="create-api-client" class="space-y-4" @submit.prevent="saveClient">
+        <FormField v-if="isAdmin && !editingClient" label="Organization" required>
           <AppSelect v-model="form.organizationId">
             <option value="" disabled>Select organization</option>
             <option v-for="org in organizations" :key="org.id" :value="org.id">{{ org.name }}</option>
@@ -240,15 +279,26 @@ async function revoke(client: ApiClient) {
         <FormField label="Rate limit per minute">
           <AppInput v-model.number="form.rateLimitPerMinute" type="number" min="1" max="10000" />
         </FormField>
-        <FormField label="Permissions">
+        <FormField
+          label="Permissions"
+          hint="WALLET_READ and WALLET_TOPUP let the integrating app show balance and top up on its own site instead of the Nova SMS portal."
+        >
           <div class="flex flex-col gap-2">
-            <label v-for="permission in ALL_PERMISSIONS" :key="permission" class="flex items-center gap-2 text-sm">
+            <label
+              v-for="permission in API_PERMISSIONS"
+              :key="permission.id"
+              class="flex items-start gap-2 text-sm"
+            >
               <input
+                class="mt-0.5"
                 type="checkbox"
-                :checked="form.permissions.includes(permission)"
-                @change="togglePermission(permission)"
+                :checked="form.permissions.includes(permission.id)"
+                @change="togglePermission(permission.id)"
               />
-              {{ permission }}
+              <span>
+                <span class="font-medium text-slate-800">{{ permission.label }}</span>
+                <span class="block text-xs text-slate-500">{{ permission.hint }}</span>
+              </span>
             </label>
           </div>
         </FormField>
@@ -256,7 +306,9 @@ async function revoke(client: ApiClient) {
       </form>
       <template #footer>
         <AppButton variant="secondary" :disabled="saving" @click="showCreate = false">Cancel</AppButton>
-        <AppButton type="submit" form="create-api-client" :loading="saving">Create</AppButton>
+        <AppButton type="submit" form="create-api-client" :loading="saving">
+          {{ editingClient ? 'Save permissions' : 'Create' }}
+        </AppButton>
       </template>
     </AppModal>
   </div>

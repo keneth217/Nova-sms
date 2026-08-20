@@ -8,6 +8,7 @@ import com.novastack.sms.domain.enums.BillingStatus;
 import com.novastack.sms.domain.enums.MessageChannel;
 import com.novastack.sms.domain.enums.OrganizationAccountType;
 import com.novastack.sms.domain.enums.OrganizationBillingModel;
+import com.novastack.sms.domain.enums.PaymentMethod;
 import com.novastack.sms.domain.enums.OrganizationStatus;
 import com.novastack.sms.domain.enums.SenderIdStatus;
 import com.novastack.sms.domain.enums.TopupStatus;
@@ -22,13 +23,17 @@ import com.novastack.sms.domain.repository.WalletTransactionRepository;
 import com.novastack.sms.dto.request.AdminCreateOrganizationRequest;
 import com.novastack.sms.dto.request.AdminCreditWalletRequest;
 import com.novastack.sms.dto.request.UpdatePlatformBillingRequest;
+import com.novastack.sms.dto.request.UpdatePlatformSmsSettingsRequest;
 import com.novastack.sms.dto.response.AdminOrganizationResponse;
 import com.novastack.sms.dto.response.PlatformBillingResponse;
+import com.novastack.sms.dto.response.PlatformNotificationSettingsResponse;
+import com.novastack.sms.dto.response.PlatformOverviewResponse;
 import com.novastack.sms.dto.response.UserResponse;
 import com.novastack.sms.dto.response.WalletTransactionResponse;
 import com.novastack.sms.exception.ApiException;
 import com.novastack.sms.util.PhoneNormalizer;
 import lombok.RequiredArgsConstructor;
+import org.hibernate.Hibernate;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -38,9 +43,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -55,8 +58,10 @@ public class AdminService {
     private final WalletTransactionRepository walletTransactionRepository;
     private final WalletService walletService;
     private final BillingSettingsService billingSettingsService;
+    private final SmsSettingsService smsSettingsService;
     private final PasswordEncoder passwordEncoder;
     private final AppProperties appProperties;
+    private final OrgNotificationService orgNotificationService;
 
     @Transactional(readOnly = true)
     public Page<AdminOrganizationResponse> listOrganizations(
@@ -107,11 +112,11 @@ public class AdminService {
                 .accountType(accountType)
                 .billingModel(billingModel)
                 .smsCost(request.getSmsCost() != null ? request.getSmsCost() : billingSettingsService.customerPrice())
+                .notificationsEnabled(true)
+                .lowBalanceThreshold(smsSettingsService.lowBalanceThreshold())
                 .build();
         organization = organizationRepository.save(organization);
-        String compact = organization.getId().toString().replace("-", "");
-        organization.setMpesaAccountRef(("NOVA" + compact.substring(0, Math.min(8, compact.length()))).toUpperCase());
-        organization = organizationRepository.save(organization);
+        organization = walletService.ensureMpesaAccountRef(organization);
         walletService.createForOrganization(organization);
 
         if (request.getAdminFullName() != null && !request.getAdminFullName().isBlank()
@@ -125,6 +130,8 @@ public class AdminService {
                     .enabled(true)
                     .build());
         }
+
+        orgNotificationService.notifyWelcome(organization);
 
         if (request.getInitialCredit() != null && request.getInitialCredit().compareTo(BigDecimal.ZERO) > 0) {
             walletService.adjust(
@@ -164,18 +171,20 @@ public class AdminService {
     }
 
     @Transactional(readOnly = true)
-    public Map<String, Long> platformOverview() {
-        Map<String, Long> overview = new HashMap<>();
-        overview.put("organizations", organizationRepository.count());
-        overview.put("users", userRepository.count());
-        overview.put("superAdmins", userRepository.countByRole(UserRole.SUPER_ADMIN));
-        overview.put("totalSmsSent", smsMessageRepository.count());
-        overview.put("pendingSenderIds", senderIdRepository.countByStatus(SenderIdStatus.PENDING));
-        overview.put(
-                "pendingTopups",
-                walletTransactionRepository.countByTypeAndTopupStatus(
-                        WalletTransactionType.TOPUP, TopupStatus.PENDING));
-        return overview;
+    public PlatformOverviewResponse platformOverview() {
+        BigDecimal threshold = smsSettingsService.lowBalanceThreshold();
+        return PlatformOverviewResponse.builder()
+                .organizations(organizationRepository.count())
+                .users(userRepository.count())
+                .superAdmins(userRepository.countByRole(UserRole.SUPER_ADMIN))
+                .totalSmsSent(smsMessageRepository.count())
+                .pendingSenderIds(senderIdRepository.countByStatus(SenderIdStatus.PENDING))
+                .pendingTopups(walletTransactionRepository.countByTypeAndTopupStatus(
+                        WalletTransactionType.TOPUP, TopupStatus.PENDING))
+                .totalOrgWalletBalance(walletRepository.sumAllBalances())
+                .currency(billingSettingsService.currency())
+                .lowBalanceThreshold(threshold)
+                .build();
     }
 
     @Transactional(readOnly = true)
@@ -231,6 +240,38 @@ public class AdminService {
         return platformBilling();
     }
 
+    @Transactional(readOnly = true)
+    public PlatformNotificationSettingsResponse platformNotifications() {
+        return toNotificationResponse(smsSettingsService.current());
+    }
+
+    @Transactional
+    public PlatformNotificationSettingsResponse updatePlatformNotifications(
+            UpdatePlatformSmsSettingsRequest request) {
+        return toNotificationResponse(smsSettingsService.update(request));
+    }
+
+    private PlatformNotificationSettingsResponse toNotificationResponse(
+            com.novastack.sms.domain.entity.PlatformSmsSettings settings) {
+        return PlatformNotificationSettingsResponse.builder()
+                .enabled(settings.isEnabled())
+                .lowBalanceThreshold(smsSettingsService.lowBalanceThreshold())
+                .portalUrl(smsSettingsService.portalUrl())
+                .welcomeTemplate(smsSettingsService.welcomeTemplate())
+                .topupTemplate(smsSettingsService.topupTemplate())
+                .collectionTemplate(smsSettingsService.collectionTemplate())
+                .lowBalanceTemplate(smsSettingsService.lowBalanceTemplate())
+                .platformTopupTemplate(smsSettingsService.platformTopupTemplate())
+                .providerLowTemplate(smsSettingsService.providerLowTemplate())
+                .providerExposureTemplate(smsSettingsService.providerExposureTemplate())
+                .talksasaLastRemaining(settings.getTalksasaLastRemaining())
+                .talksasaLowAlerted(settings.isTalksasaLowAlerted())
+                .talksasaExposureAlerted(settings.isTalksasaExposureAlerted())
+                .collectionAccounts(smsSettingsService.collectionAccounts())
+                .collectionNotifyPhones(smsSettingsService.collectionNotifyPhones())
+                .build();
+    }
+
     private static BigDecimal nullToZero(BigDecimal value) {
         return value == null ? BigDecimal.ZERO : value;
     }
@@ -277,6 +318,7 @@ public class AdminService {
         return UserResponse.builder()
                 .id(user.getId())
                 .email(user.getEmail())
+                .phone(resolveUserPhone(user))
                 .fullName(user.getFullName())
                 .role(user.getRole())
                 .enabled(user.isEnabled())
@@ -286,10 +328,32 @@ public class AdminService {
                 .build();
     }
 
+    private static String resolveUserPhone(User user) {
+        if (user.getPhone() != null && !user.getPhone().isBlank()) {
+            return user.getPhone().trim();
+        }
+        return user.getOrganization() != null ? user.getOrganization().getPhone() : null;
+    }
+
     private WalletTransactionResponse toTransactionResponse(WalletTransaction tx) {
+        Organization org = tx.getOrganization();
+        UUID organizationId = org != null ? org.getId() : null;
+        if (org != null && !Hibernate.isInitialized(org)) {
+            org = null;
+        }
+        String account = tx.getBillRef();
+        if ((account == null || account.isBlank()) && org != null) {
+            account = org.getMpesaAccountRef();
+        }
+        PaymentMethod method = tx.getPaymentMethod();
+        if (method == null && tx.getCheckoutRequestId() != null && !tx.getCheckoutRequestId().isBlank()) {
+            method = PaymentMethod.STK_PUSH;
+        } else if (method == null) {
+            method = PaymentMethod.PAYBILL;
+        }
         return WalletTransactionResponse.builder()
                 .id(tx.getId())
-                .organizationId(tx.getOrganization().getId())
+                .organizationId(organizationId)
                 .type(tx.getType())
                 .amount(tx.getAmount())
                 .balanceBefore(tx.getBalanceBefore())
@@ -302,6 +366,12 @@ public class AdminService {
                 .status(tx.getTopupStatus())
                 .resultCode(tx.getResultCode())
                 .resultDesc(tx.getResultDesc())
+                .callbackReceived(tx.isCallbackReceived())
+                .walletCredited(tx.isWalletCredited())
+                .paymentMethod(method)
+                .paybill(appProperties.getMpesa().getShortcode())
+                .accountNumber(account)
+                .organizationName(org != null ? org.getName() : null)
                 .createdAt(tx.getCreatedAt())
                 .build();
     }

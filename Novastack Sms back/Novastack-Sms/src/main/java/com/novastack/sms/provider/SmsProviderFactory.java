@@ -96,6 +96,10 @@ public class SmsProviderFactory {
         AppProperties.AfricasTalking platform = appProperties.getAfricastalking();
         boolean sandboxMode = isSandboxMode(platform);
 
+        if (org == null) {
+            return new AtCredentials(null, null, platform.getBaseUrl());
+        }
+
         if (sandboxMode) {
             if (hasText(org.getAtUsername())
                     && !"sandbox".equalsIgnoreCase(org.getAtUsername().trim())) {

@@ -110,6 +110,34 @@ export const useSmsStore = defineStore('sms', () => {
     }
   }
 
+  async function resendFailed(batchId: string, channel: MessageChannel = 'SMS') {
+    loading.value = true
+    error.value = null
+    try {
+      lastBulk.value = await smsService.resendFailed(batchId, channel)
+      return lastBulk.value
+    } catch (e) {
+      error.value = e instanceof Error ? e.message : 'Resend failed'
+      throw e
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function resendMessage(id: string, channel: MessageChannel = 'SMS') {
+    loading.value = true
+    error.value = null
+    try {
+      lastSend.value = await smsService.resend(id, channel)
+      return lastSend.value
+    } catch (e) {
+      error.value = e instanceof Error ? e.message : 'Resend failed'
+      throw e
+    } finally {
+      loading.value = false
+    }
+  }
+
   async function requestSenderId(senderName: string) {
     loading.value = true
     error.value = null
@@ -139,6 +167,8 @@ export const useSmsStore = defineStore('sms', () => {
     sendSms,
     sendBulk,
     scheduleSms,
+    resendFailed,
+    resendMessage,
     requestSenderId,
   }
 })

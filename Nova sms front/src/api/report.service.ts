@@ -73,7 +73,7 @@ function buildCampaigns(messages: SmsMessage[]): CampaignSummary[] {
   return [...byBatch.entries()]
     .map(([id, list]) => {
       const delivered = list.filter((m) => m.status === 'DELIVERED').length
-      const failed = list.filter((m) => m.status === 'FAILED').length
+      const failed = list.filter((m) => m.status === 'FAILED' || m.status === 'REJECTED' || m.status === 'CANCELLED').length
       const cost = list.reduce((sum, m) => sum + (Number(m.cost) || 0), 0)
       const newest = list.reduce((a, b) => (a.createdAt > b.createdAt ? a : b))
       return {

@@ -122,7 +122,7 @@ async function goLogin() {
         class="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm shadow-slate-900/5 sm:p-8"
       >
         <template v-if="!success">
-          <h2 class="text-xl font-semibold text-slate-900">{{ copy.title }}</h2>
+          <h1 class="text-xl font-semibold text-slate-900">{{ copy.title }}</h1>
           <p class="mt-1 text-sm text-slate-500">{{ copy.subtitle }}</p>
 
           <div class="mt-4 grid grid-cols-2 gap-2 rounded-lg bg-slate-100 p-1">

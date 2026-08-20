@@ -38,6 +38,20 @@ Optional: `Idempotency-Key`. Optional `senderId` must be approved for the organi
 
 Read `data.id` for later `GET /api/v1/sms/{id}/status`.
 
+## Wallet on your site
+
+With `WALLET_READ` / `WALLET_TOPUP` on the API client:
+
+```text
+GET  {origin}/api/v1/wallet/balance
+POST {origin}/api/v1/wallet/topup
+POST {origin}/api/v1/wallet/topup/{transactionId}/check
+```
+
+Your users can see SMS credit and top up with M-Pesa without using the Nova SMS portal.
+
+After `POST /topup`, read `data.transactionId`, wait ~5 seconds, then poll `POST …/check` every 3–5 seconds while `PENDING`. Stop when `COMPLETED` and `walletCredited=true`, or on definitive `FAILED`. Then `GET /api/v1/wallet/balance`. See [Wallet](../api/wallet.md).
+
 ## Security
 
 ```text

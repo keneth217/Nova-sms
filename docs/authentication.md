@@ -24,7 +24,7 @@ export NOVA_SMS_API_KEY="nova_live_xxxxxxxxx"
 4. Click **New API client** (Create API Client).
 5. Select the organization (for example Mwalimu or Chamaplus).
 6. Enter the application name.
-7. Select permissions (`SMS_SEND`, `SMS_BULK`, `SMS_STATUS`, `SMS_HISTORY`).
+7. Select permissions (`SMS_SEND`, `SMS_BULK`, `SMS_STATUS`, `SMS_HISTORY`, `WALLET_READ`, `WALLET_TOPUP`).
 8. Configure the per-minute rate limit (default 100).
 9. Create the API client.
 10. Copy the API key immediately. The full key is shown **only once**.
@@ -42,7 +42,7 @@ Revoked keys are rotated to a random hash and stop working immediately. Rotate t
 
 ### Scoped permissions
 
-Hashed live keys are scoped. They may only call `/api/v1/sms/**`, and only with granted permissions:
+Hashed live keys are scoped. They may call `/api/v1/sms/**` and, when granted, `/api/v1/wallet/**`:
 
 | Permission     | Endpoints |
 | -------------- | --------- |
@@ -50,8 +50,10 @@ Hashed live keys are scoped. They may only call `/api/v1/sms/**`, and only with 
 | `SMS_BULK`     | `POST /api/v1/sms/bulk`, `POST /api/v1/sms/schedule` |
 | `SMS_STATUS`   | `GET /api/v1/sms/{id}`, `GET /api/v1/sms/{id}/status` |
 | `SMS_HISTORY`  | `GET /api/v1/sms/history` |
+| `WALLET_READ`  | `GET /api/v1/wallet/balance`, `GET /api/v1/wallet/transactions` |
+| `WALLET_TOPUP` | `POST /api/v1/wallet/topup`, `GET /api/v1/wallet/topup/{id}`, `POST /api/v1/wallet/topup/{id}/check` |
 
-Default permissions when none are specified: `SMS_SEND`, `SMS_BULK`, `SMS_STATUS`.
+Default permissions when none are specified: `SMS_SEND`, `SMS_BULK`, `SMS_STATUS`. Grant `WALLET_READ` and `WALLET_TOPUP` so partner apps can show balance and top up on their own site.
 
 Missing permission returns HTTP **403**:
 
@@ -59,7 +61,7 @@ Missing permission returns HTTP **403**:
 { "success": false, "message": "API key is missing permission SMS_HISTORY" }
 ```
 
-A scoped key used outside `/api/v1/sms` returns HTTP **403**:
+A scoped key used outside `/api/v1/sms` and `/api/v1/wallet` returns HTTP **403**:
 
 ```json
 { "success": false, "message": "This API key cannot access that resource" }

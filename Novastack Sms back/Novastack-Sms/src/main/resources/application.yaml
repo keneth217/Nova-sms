@@ -80,6 +80,9 @@ novastack:
       enabled: ${SMS_STATUS_SYNC_ENABLED:true}
       cron: ${SMS_STATUS_SYNC_CRON:0 */5 * * * *}
       batch-size: ${SMS_STATUS_SYNC_BATCH_SIZE:50}
+    provider-units-alert:
+      enabled: ${SMS_PROVIDER_UNITS_ALERT_ENABLED:true}
+      cron: ${SMS_PROVIDER_UNITS_ALERT_CRON:0 */10 * * * *}
     talksasa:
       base-url: ${TALKSASA_BASE_URL:https://bulksms.talksasa.com/api/v3}
       api-token: ${TALKSASA_API_TOKEN:4146|qkHeGBhoB5SaWz9lSu7vzX6HJpWVlpQwzTwqPDUGd16ea17b}
@@ -102,6 +105,12 @@ novastack:
     base-url: ${MPESA_BASE_URL:https://api.safaricom.co.ke}
     account-reference-prefix: NOVA
     transaction-desc: Novastack SMS top-up
+    collection-accounts:
+      - SHEILA
+      - KENETH
+    collection-notify-phones:
+      - "0711766223"
+      - "0759728742"
   data-bundles:
     # Same Daraja Consumer Key/Secret as M-Pesa is supported (shared app).
     consumer-key: ${DATA_BUNDLES_CONSUMER_KEY:${MPESA_CONSUMER_KEY:6YuGUYzOux3iNcpfmcYobMN27exn1guLAEyGaqyMECG0EGZG}}
@@ -124,8 +133,21 @@ novastack:
     email: ${SUPER_ADMIN_EMAIL:kipyegonkeneth03@gmail.com}
     password: ${SUPER_ADMIN_PASSWORD:Designer@3689.}
     full-name: Keneth Kipyegon
+    phone: ${SUPER_ADMIN_PHONE:0711766223}
   organization:
     event-active-days: ${ORG_EVENT_ACTIVE_DAYS:7}
+  notifications:
+    enabled: ${NOVA_SMS_NOTIFICATIONS_ENABLED:true}
+    low-balance-threshold: ${NOVA_SMS_LOW_BALANCE_THRESHOLD:50.00}
+    portal-url: ${FRONTEND_BASE_URL:https://novasms.novastack.co.ke}
+    templates:
+      welcome: "Welcome to Nova SMS, {name}! Your organization account is ready. Top up your wallet via M-Pesa to start sending SMS. {portalUrl}"
+      topup: "Nova SMS: KES {amount} credited to your wallet.{receipt} New balance: KES {balance}."
+      collection: "KES {amount} has been received from {payer} for {account}.{receipt}"
+      low-balance: "Nova SMS: Your wallet balance is low (KES {balance}). Top up via M-Pesa to keep sending SMS."
+      platform-topup: "Nova SMS: {name} ({account}) topped up KES {amount}.{receipt} Bal KES {balance}. {time}"
+      provider-low: "Nova SMS: TalkSasa remaining {units} units. Threshold {threshold}. Top up the provider account."
+      provider-exposure: "Nova SMS: Org wallets KES {wallets} exceed TalkSasa {units} units. Top up the provider account."
 
 logging:
   level:

@@ -16,4 +16,7 @@ public class WalletBalanceResponse {
     private String currency;
     private BigDecimal smsCost;
     private Long availableSms;
+    private String paybill;
+    private String accountNumber;
+    private String businessName;
 }

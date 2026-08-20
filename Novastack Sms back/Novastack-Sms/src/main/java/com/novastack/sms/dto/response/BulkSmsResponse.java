@@ -15,5 +15,9 @@ public class BulkSmsResponse {
     private int recipientCount;
     private int smsUnits;
     private String status;
+    private UUID sourceBatchId;
+    private Integer resentCount;
+    private Integer skippedCount;
+    private Integer failedCount;
     private List<SmsMessageResponse> messages;
 }

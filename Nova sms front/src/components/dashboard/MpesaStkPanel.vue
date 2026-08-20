@@ -58,7 +58,7 @@ const subtitle = computed(() => {
     case 'FAILED':
       return props.transaction?.resultDesc || 'The M-Pesa payment could not be completed.'
     case 'EXPIRED':
-      return 'No confirmation was received in time. You can try again.'
+      return 'Still waiting for M-Pesa. Do not start another payment until this one finishes.'
     default:
       return 'Check your phone for the M-Pesa payment request.'
   }
@@ -177,6 +177,13 @@ startTimer()
           {{ formatCurrency(amount, currency) }}
         </span>
       </div>
+      <div
+        v-if="transaction?.mpesaReceipt && displayStatus === 'SUCCESS'"
+        class="flex items-center justify-between border-t border-slate-100 px-4 py-3 text-sm"
+      >
+        <span class="text-slate-500">Receipt</span>
+        <span class="font-mono font-semibold text-emerald-700">{{ transaction.mpesaReceipt }}</span>
+      </div>
     </div>
 
     <p class="mt-4 text-xs leading-relaxed text-slate-500">
@@ -188,7 +195,7 @@ startTimer()
         Cancel
       </AppButton>
       <AppButton v-else block @click="emit('close')">
-        {{ displayStatus === 'SUCCESS' ? 'Done' : 'Try again' }}
+        {{ displayStatus === 'SUCCESS' ? 'Done' : displayStatus === 'EXPIRED' ? 'Keep waiting' : 'Try again' }}
       </AppButton>
     </div>
   </div>

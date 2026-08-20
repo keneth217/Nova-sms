@@ -180,7 +180,7 @@ Content-Type: application/json
 { "recipient": "254712345678", "message": "Your payment has been received." }
 ```
 
-Keys are hashed at rest (`api_clients`). Permissions: `SMS_SEND`, `SMS_BULK`, `SMS_STATUS`, `SMS_HISTORY`. Per-client rate limits return HTTP 429. Both dashboard and API clients call the same `SmsService` and organization wallet. TalkSasa credentials never leave the backend.
+Keys are hashed at rest (`api_clients`). Permissions: `SMS_SEND`, `SMS_BULK`, `SMS_STATUS`, `SMS_HISTORY`, `WALLET_READ`, `WALLET_TOPUP`. Per-client rate limits return HTTP 429. Both dashboard and API clients call the same `SmsService` and organization wallet. TalkSasa credentials never leave the backend.
 
 ### Contacts, groups & Excel import
 
@@ -289,14 +289,7 @@ Content-Type: application/json
 }
 ```
 
-Poll status:
-
-```http
-GET /api/v1/wallet/topup/{transactionId}
-Authorization: Bearer <token>
-```
-
-**Check transaction** (recommended after STK — polls DB, and if still `PENDING` queries Safaricom then updates DB):
+Poll status with **`POST …/check`** (queries Safaricom when still `PENDING`). `GET …/{id}` only reads the stored row.
 
 ```http
 POST /api/v1/wallet/topup/{transactionId}/check
@@ -305,7 +298,20 @@ Authorization: Bearer <token>
 
 Response fields include `status` (`PENDING` | `COMPLETED` | `FAILED`), `callbackReceived`, `walletCredited`, `mpesaReceipt`.
 
-Frontend tip: after top-up, poll `POST .../check` every 3–5 seconds until `callbackReceived` is `true`.
+**Polling rules**
+
+1. Read `data.transactionId` from the initial top-up response.
+2. Wait approximately 5 seconds before the first status check.
+3. Call `POST /api/v1/wallet/topup/{transactionId}/check` every 3–5 seconds.
+4. Continue polling while `status` is `PENDING`.
+5. `"The transaction is still under processing"` is `PENDING`, not `FAILED`.
+6. Stop polling when `status` is `COMPLETED` and `walletCredited=true`.
+7. Stop polling when Nova reports a definitive `FAILED` status.
+8. Never create another STK Push while the existing transaction is still `PENDING`.
+9. `GET /api/v1/wallet/topup/{id}` may be used to recover/read the transaction, but it does not query Safaricom.
+10. After successful completion, call `GET /api/v1/wallet/balance` to refresh the organization's SMS balance.
+
+Do not wait only on `callbackReceived` — a successful STK query can credit the wallet before the Safaricom callback arrives.
 
 **Daraja env vars**
 
@@ -324,10 +330,11 @@ Register this callback in Daraja / ensure it is reachable:
 {MPESA_CALLBACK_BASE_URL}/api/v1/mpesa/stk/callback
 ```
 
-Optional C2B (manual Paybill pay): account number = org `mpesaAccountRef` (returned on registration), confirmation URL:
+Optional C2B v2 (Paybill 5687394): account number = org `mpesaAccountRef`. `TransID` in the confirmation is the M-Pesa receipt. Register once with `POST /api/v1/admin/mpesa/c2b/register` (or Daraja C2B v2 `registerurl`). URLs must not contain the word `mpesa`:
 
 ```
-{MPESA_CALLBACK_BASE_URL}/api/v1/mpesa/c2b/confirmation
+{MPESA_CALLBACK_BASE_URL}/api/v1/payments/c2b/confirmation
+{MPESA_CALLBACK_BASE_URL}/api/v1/payments/c2b/validation
 ```
 
 ### Send SMS

@@ -72,6 +72,28 @@ class SmsService {
     if (!data.success || !data.data) throw new Error(data.message || 'Failed to refresh SMS status')
     return data.data
   }
+
+  async getBatch(batchId: string, channel: MessageChannel = 'SMS'): Promise<BulkSmsResponse> {
+    const { data } = await api.get<ApiResponse<BulkSmsResponse>>(
+      `${channelRoot(channel)}/batches/${batchId}`,
+    )
+    if (!data.success || !data.data) throw new Error(data.message || 'Failed to load batch')
+    return data.data
+  }
+
+  async resendFailed(batchId: string, channel: MessageChannel = 'SMS'): Promise<BulkSmsResponse> {
+    const { data } = await api.post<ApiResponse<BulkSmsResponse>>(
+      `${channelRoot(channel)}/batches/${batchId}/resend-failed`,
+    )
+    if (!data.success || !data.data) throw new Error(data.message || 'Failed to resend failed messages')
+    return data.data
+  }
+
+  async resend(id: string, channel: MessageChannel = 'SMS'): Promise<SmsMessage> {
+    const { data } = await api.post<ApiResponse<SmsMessage>>(`${channelRoot(channel)}/${id}/resend`)
+    if (!data.success || !data.data) throw new Error(data.message || 'Failed to resend message')
+    return data.data
+  }
 }
 
 export const smsService = new SmsService()

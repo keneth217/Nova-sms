@@ -16,10 +16,12 @@ import {
   Cog6ToothIcon,
   BuildingOffice2Icon,
   BanknotesIcon,
+  ChartPieIcon,
   SignalIcon,
   PresentationChartLineIcon,
   UserCircleIcon,
   DevicePhoneMobileIcon,
+  BellAlertIcon,
   XMarkIcon,
 } from '@heroicons/vue/24/outline'
 import { useAuthStore } from '@/stores/auth.store'
@@ -52,7 +54,9 @@ const adminLinks = [
   { to: '/admin/system-reports', label: 'Overview', icon: PresentationChartLineIcon },
   { to: '/admin/organizations', label: 'Organizations', icon: BuildingOffice2Icon },
   { to: '/admin/topups', label: 'Wallet Funding', icon: BanknotesIcon },
+  { to: '/admin/collections', label: 'Paybill collections', icon: ChartPieIcon },
   { to: '/admin/sms-monitoring', label: 'SMS Monitoring', icon: SignalIcon },
+  { to: '/admin/sms-settings', label: 'SMS settings', icon: BellAlertIcon },
   { to: '/admin/developer', label: 'Developer', icon: BookOpenIcon },
   { to: '/sender-ids', label: 'Sender IDs', icon: IdentificationIcon },
   { to: '/profile', label: 'Profile', icon: UserCircleIcon },

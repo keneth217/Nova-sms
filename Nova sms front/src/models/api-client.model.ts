@@ -1,5 +1,20 @@
 export type ApiClientStatus = 'ACTIVE' | 'DISABLED' | 'REVOKED'
-export type ApiPermission = 'SMS_SEND' | 'SMS_BULK' | 'SMS_STATUS' | 'SMS_HISTORY'
+export type ApiPermission =
+  | 'SMS_SEND'
+  | 'SMS_BULK'
+  | 'SMS_STATUS'
+  | 'SMS_HISTORY'
+  | 'WALLET_READ'
+  | 'WALLET_TOPUP'
+
+export const API_PERMISSIONS: { id: ApiPermission; label: string; hint: string }[] = [
+  { id: 'SMS_SEND', label: 'SMS_SEND', hint: 'Send one SMS' },
+  { id: 'SMS_BULK', label: 'SMS_BULK', hint: 'Bulk and scheduled SMS' },
+  { id: 'SMS_STATUS', label: 'SMS_STATUS', hint: 'Look up SMS status' },
+  { id: 'SMS_HISTORY', label: 'SMS_HISTORY', hint: 'List SMS history' },
+  { id: 'WALLET_READ', label: 'WALLET_READ', hint: 'Show wallet balance and transactions on your site' },
+  { id: 'WALLET_TOPUP', label: 'WALLET_TOPUP', hint: 'Let users top up via M-Pesa STK from your site' },
+]
 export type OrganizationBillingModel = 'PREPAID' | 'MONTHLY' | 'INTERNAL'
 
 export interface ApiClient {

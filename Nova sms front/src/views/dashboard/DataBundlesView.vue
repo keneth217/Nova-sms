@@ -67,7 +67,8 @@ async function confirmPurchase(payload: PurchaseConfirmPayload) {
         Data bundles
       </h1>
       <p class="mt-3 max-w-2xl text-slate-600">
-        Enter a Safaricom number (07… or 011…) to browse data offers — no account required.
+        Enter a Safaricom number (07… or 011…) to browse data offers in Kenya — no Nova SMS account
+        required to look up offers. Purchase uses Safaricom’s offer APIs through this page.
       </p>
     </div>
 

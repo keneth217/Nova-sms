@@ -1,6 +1,9 @@
 import { createRouter, createWebHistory, type RouteLocationNormalized, type RouteRecordRaw } from 'vue-router'
 import { useAuthStore } from '@/stores/auth.store'
 import type { UserRole } from '@/models/auth.model'
+import { applySeo, applySeoFromRoute } from '@/composables/useSeo'
+import { publicDocSeo } from '@/seo/doc-seo'
+import type { PublicDocSlug } from '@/seo/public-paths'
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -8,6 +11,12 @@ declare module 'vue-router' {
     guestOnly?: boolean
     roles?: UserRole[]
     title?: string
+    seoTitle?: string
+    description?: string
+    robots?: string
+    ogImage?: string
+    ogType?: string
+    canonicalPath?: string
     layout?: 'dashboard' | 'marketing'
     channel?: 'SMS' | 'WHATSAPP'
     docId?: string
@@ -43,68 +52,210 @@ const routes: RouteRecordRaw[] = [
         path: '',
         name: 'home',
         component: () => import('@/views/LandingView.vue'),
-        meta: { title: 'Home', guestOnly: true },
+        meta: {
+          title: 'Home',
+          guestOnly: true,
+          seoTitle: 'Nova SMS — Bulk SMS Gateway & M-Pesa API for Kenya',
+          description:
+            'Send bulk SMS in Kenya with Nova SMS. Integrate M-Pesa STK Push and Paybill top-up, track delivery, and call a REST API from your backend.',
+        },
+      },
+      {
+        path: 'sms-gateway',
+        name: 'sms-gateway',
+        component: () => import('@/views/marketing/SmsGatewayView.vue'),
+        meta: {
+          title: 'Bulk SMS gateway',
+          seoTitle: 'Bulk SMS Gateway for Kenya | Nova SMS',
+          description:
+            'Prepaid bulk SMS for Kenyan businesses and events. Contacts, sender IDs, delivery reports, and M-Pesa wallet top-up.',
+        },
+      },
+      {
+        path: 'mpesa-stk-push',
+        name: 'mpesa-stk-push',
+        component: () => import('@/views/marketing/StkPushView.vue'),
+        meta: {
+          title: 'M-Pesa STK Push',
+          seoTitle: 'M-Pesa STK Push API for SMS wallet top-up | Nova SMS',
+          description:
+            'How Nova SMS uses Safaricom STK Push to fund SMS wallets, including payment lifecycle, callbacks, and polling.',
+        },
+      },
+      {
+        path: 'mpesa-paybill',
+        name: 'mpesa-paybill',
+        component: () => import('@/views/marketing/PaybillView.vue'),
+        meta: {
+          title: 'M-Pesa Paybill C2B',
+          seoTitle: 'M-Pesa Paybill C2B payments for SMS wallets | Nova SMS',
+          description:
+            'Fund a Nova SMS wallet with Paybill C2B. Account number is the organization M-Pesa reference. Receipts are credited once.',
+        },
+      },
+      {
+        path: 'webhooks',
+        name: 'webhooks',
+        component: () => import('@/views/marketing/WebhooksView.vue'),
+        meta: {
+          title: 'M-Pesa callbacks',
+          seoTitle: 'M-Pesa callbacks, retries, and payment status | Nova SMS',
+          description:
+            'Safaricom STK and C2B callbacks are processed by Nova SMS. Poll wallet status for idempotent credits and SMS delivery.',
+        },
+      },
+      {
+        path: 'sms-api',
+        name: 'sms-api',
+        component: () => import('@/views/marketing/SmsApiView.vue'),
+        meta: {
+          title: 'SMS API',
+          seoTitle: 'Nova SMS API — send SMS and M-Pesa wallet top-up',
+          description:
+            'REST API authentication, send SMS, check status, handle errors, and start M-Pesa STK Push from your backend.',
+        },
+      },
+      {
+        path: 'pricing',
+        name: 'pricing',
+        component: () => import('@/views/marketing/PricingView.vue'),
+        meta: {
+          title: 'Pricing',
+          seoTitle: 'Nova SMS pricing — prepaid SMS wallet in Kenya',
+          description:
+            'Nova SMS is prepaid in KES. Top up with M-Pesa and pay per SMS from the organization wallet. Event and business accounts.',
+        },
+      },
+      {
+        path: 'about',
+        name: 'about',
+        component: () => import('@/views/marketing/AboutView.vue'),
+        meta: {
+          title: 'About',
+          seoTitle: 'About Nova SMS',
+          description:
+            'Nova SMS is Novastack’s bulk SMS platform for Kenya, with prepaid wallets and M-Pesa top-up.',
+        },
+      },
+      {
+        path: 'contact',
+        name: 'contact',
+        component: () => import('@/views/marketing/ContactView.vue'),
+        meta: {
+          title: 'Contact',
+          seoTitle: 'Contact Nova SMS',
+          description: 'Email Nova SMS support or create an account to send SMS and top up with M-Pesa.',
+        },
+      },
+      {
+        path: 'faq',
+        name: 'faq',
+        component: () => import('@/views/marketing/FaqView.vue'),
+        meta: {
+          title: 'FAQ',
+          seoTitle: 'Nova SMS FAQ — STK Push, Paybill, API, and wallets',
+          description:
+            'Answers about Nova SMS, M-Pesa STK Push, C2B Paybill funding, API keys, and payment status.',
+        },
       },
       {
         path: 'login',
         name: 'login',
         component: () => import('@/views/auth/LoginView.vue'),
-        meta: { guestOnly: true, title: 'Sign in' },
+        meta: {
+          guestOnly: true,
+          title: 'Sign in',
+          robots: 'noindex,nofollow',
+          description: 'Sign in to your Nova SMS organization dashboard.',
+        },
       },
       {
         path: 'register',
         name: 'register',
         component: () => import('@/views/auth/RegisterView.vue'),
-        meta: { guestOnly: true, title: 'Create account' },
+        meta: { guestOnly: true, title: 'Create account', robots: 'noindex,nofollow' },
       },
       {
         path: 'forgot-password',
         name: 'forgot-password',
         component: () => import('@/views/auth/ForgotPasswordView.vue'),
-        meta: { guestOnly: true, title: 'Forgot password' },
+        meta: { guestOnly: true, title: 'Forgot password', robots: 'noindex,nofollow' },
       },
       {
         path: 'reset-password',
         name: 'reset-password',
         component: () => import('@/views/auth/ResetPasswordView.vue'),
-        meta: { guestOnly: true, title: 'Reset password' },
+        meta: { guestOnly: true, title: 'Reset password', robots: 'noindex,nofollow' },
       },
       {
         path: 'terms',
         name: 'terms',
         component: () => import('@/views/legal/TermsView.vue'),
-        meta: { title: 'Terms of Service' },
+        meta: {
+          title: 'Terms of Service',
+          seoTitle: 'Terms of Service | Nova SMS',
+          description: 'Terms of Service for the Nova SMS bulk messaging platform.',
+        },
       },
       {
         path: 'privacy',
         name: 'privacy',
         component: () => import('@/views/legal/PrivacyView.vue'),
-        meta: { title: 'Privacy Policy' },
+        meta: {
+          title: 'Privacy Policy',
+          seoTitle: 'Privacy Policy | Nova SMS',
+          description: 'How Nova SMS collects and uses organization, message, and payment data.',
+        },
       },
       {
         path: 'acceptable-use',
         name: 'acceptable-use',
         component: () => import('@/views/legal/AcceptableUseView.vue'),
-        meta: { title: 'Acceptable Use Policy' },
+        meta: {
+          title: 'Acceptable Use Policy',
+          seoTitle: 'Acceptable Use Policy | Nova SMS',
+          description: 'Rules for sending SMS on Nova SMS, including prohibited content and consent.',
+        },
       },
       {
         path: 'data-bundles',
         name: 'data-bundles',
         component: () => import('@/views/dashboard/DataBundlesView.vue'),
-        meta: { title: 'Data Bundles' },
+        meta: {
+          title: 'Data Bundles',
+          seoTitle: 'Safaricom data bundles | Nova SMS',
+          description:
+            'Browse Safaricom data offers by phone number and purchase through Nova SMS. No account required to look up offers.',
+        },
       },
       {
         path: 'developers',
         name: 'developers',
         component: () => import('@/views/docs/DeveloperDocsView.vue'),
-        meta: { title: 'API documentation' },
+        meta: {
+          title: 'API documentation',
+          seoTitle: 'Nova SMS API documentation',
+          description:
+            'Nova SMS REST API for sending SMS, checking delivery, wallet balance, and M-Pesa STK Push top-up from your backend.',
+        },
+      },
+      {
+        path: 'developers/:slug',
+        name: 'developer-doc',
+        component: () => import('@/views/docs/PublicDocView.vue'),
+        meta: {
+          title: 'API documentation',
+          seoTitle: 'Nova SMS API documentation',
+          description:
+            'Nova SMS REST API reference for SMS, wallet top-up, authentication, errors, and language guides.',
+        },
       },
     ],
   },
   {
     path: '/',
     component: () => import('@/layouts/DashboardLayout.vue'),
-    meta: { requiresAuth: true, layout: 'dashboard' },
+    meta: { requiresAuth: true, layout: 'dashboard', robots: 'noindex,nofollow' },
     children: [
       {
         path: 'dashboard',
@@ -240,10 +391,22 @@ const routes: RouteRecordRaw[] = [
         meta: { requiresAuth: true, title: 'Wallet Funding', roles: ['SUPER_ADMIN'] },
       },
       {
+        path: 'admin/collections',
+        name: 'admin-collections',
+        component: () => import('@/views/admin/CollectionsView.vue'),
+        meta: { requiresAuth: true, title: 'Paybill collections', roles: ['SUPER_ADMIN'] },
+      },
+      {
         path: 'admin/sms-monitoring',
         name: 'admin-sms-monitoring',
         component: () => import('@/views/admin/SmsMonitoringView.vue'),
         meta: { requiresAuth: true, title: 'SMS Monitoring', roles: ['SUPER_ADMIN'] },
+      },
+      {
+        path: 'admin/sms-settings',
+        name: 'admin-sms-settings',
+        component: () => import('@/views/admin/SmsSettingsView.vue'),
+        meta: { requiresAuth: true, title: 'SMS settings', roles: ['SUPER_ADMIN'] },
       },
       {
         path: 'admin/api-clients',
@@ -286,6 +449,12 @@ const routes: RouteRecordRaw[] = [
             meta: { title: 'Bulk SMS', docId: 'bulk-sms' },
           },
           {
+            path: 'retry-failed',
+            name: 'admin-developer-retry-failed',
+            component: () => import('@/views/admin/developer/DeveloperDocView.vue'),
+            meta: { title: 'Retry failed SMS', docId: 'retry-failed' },
+          },
+          {
             path: 'status',
             name: 'admin-developer-status',
             component: () => import('@/views/admin/developer/DeveloperDocView.vue'),
@@ -296,6 +465,12 @@ const routes: RouteRecordRaw[] = [
             name: 'admin-developer-history',
             component: () => import('@/views/admin/developer/DeveloperDocView.vue'),
             meta: { title: 'SMS History', docId: 'history' },
+          },
+          {
+            path: 'wallet',
+            name: 'admin-developer-wallet',
+            component: () => import('@/views/admin/developer/DeveloperDocView.vue'),
+            meta: { title: 'Wallet', docId: 'wallet' },
           },
           {
             path: 'errors',
@@ -382,11 +557,21 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/:pathMatch(.*)*',
     name: 'not-found',
-    redirect: (to) => {
-      const auth = useAuthStore()
-      if (auth.isAuthenticated) return defaultHome(auth)
-      return { name: 'home', query: to.query, hash: to.hash }
+    component: () => import('@/layouts/MarketingLayout.vue'),
+    meta: {
+      title: 'Page not found',
+      robots: 'noindex,nofollow',
+      layout: 'marketing',
+      description: 'That Nova SMS page does not exist.',
     },
+    children: [
+      {
+        path: '',
+        name: 'not-found-page',
+        component: () => import('@/views/NotFoundView.vue'),
+        meta: { title: 'Page not found', robots: 'noindex,nofollow' },
+      },
+    ],
   },
 ]
 
@@ -403,8 +588,6 @@ const router = createRouter({
 
 router.beforeEach((to) => {
   const auth = useAuthStore()
-  const title = to.meta.title ? `${to.meta.title} · Nova SMS` : 'Nova SMS'
-  document.title = title
 
   if ((auth.accessToken && !auth.user) || (!auth.accessToken && auth.user)) {
     auth.logout(true)
@@ -439,6 +622,29 @@ router.beforeEach((to) => {
   }
 
   return true
+})
+
+router.afterEach((to) => {
+  if (to.name === 'developer-doc') {
+    const slug = String(to.params.slug || '') as PublicDocSlug
+    const seo = publicDocSeo[slug]
+    if (seo) {
+      applySeo({
+        title: seo.title,
+        description: seo.description,
+        path: to.path,
+      })
+      return
+    }
+    applySeo({
+      title: 'Documentation not found · Nova SMS',
+      description: 'That Nova SMS API page does not exist.',
+      path: to.path,
+      robots: 'noindex,nofollow',
+    })
+    return
+  }
+  applySeoFromRoute(to)
 })
 
 export default router

@@ -45,6 +45,12 @@ class WalletServiceTest {
     private BillingSettingsService billingSettingsService;
     @Mock
     private SmsBillingCalculator smsBillingCalculator;
+    @Mock
+    private OrgNotificationService orgNotificationService;
+    @Mock
+    private PaybillCollectionService paybillCollectionService;
+    @Mock
+    private C2bInboundService c2bInboundService;
 
     private WalletService walletService;
     private Organization organization;
@@ -59,7 +65,10 @@ class WalletServiceTest {
                 new AppProperties(),
                 mpesaDarajaClient,
                 billingSettingsService,
-                smsBillingCalculator);
+                smsBillingCalculator,
+                orgNotificationService,
+                paybillCollectionService,
+                c2bInboundService);
         organization = Organization.builder()
                 .id(UUID.randomUUID())
                 .name("Acme")
@@ -81,6 +90,7 @@ class WalletServiceTest {
 
         assertEquals(new BigDecimal("8.50"), wallet.getBalance());
         verify(walletTransactionRepository).save(any(WalletTransaction.class));
+        verify(orgNotificationService, never()).notifyLowBalance(any(), any());
     }
 
     @Test
@@ -158,5 +168,17 @@ class WalletServiceTest {
 
         assertEquals(new BigDecimal("10.00"), wallet.getBalance());
         verify(walletRepository, never()).findByOrganizationIdForUpdate(any());
+    }
+
+    @Test
+    void debitCrossingLowBalanceThresholdSendsAlert() {
+        wallet.setBalance(new BigDecimal("60.00"));
+        when(walletRepository.findByOrganizationIdForUpdate(organization.getId())).thenReturn(Optional.of(wallet));
+        when(orgNotificationService.crossedLowBalanceThreshold(any(Organization.class), any(), any())).thenReturn(true);
+
+        walletService.debitForSms(organization.getId(), new BigDecimal("15.00"), "SMS-LOW", "test");
+
+        assertEquals(0, new BigDecimal("45.00").compareTo(wallet.getBalance()));
+        verify(orgNotificationService).notifyLowBalance(organization, wallet.getBalance());
     }
 }

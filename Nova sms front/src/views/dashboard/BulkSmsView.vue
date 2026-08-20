@@ -39,6 +39,8 @@ const selectedContactIds = ref<string[]>([])
 const recipientSource = ref<RecipientSource>('contacts')
 const success = ref('')
 const error = ref('')
+const lastFailedBatchId = ref('')
+const lastFailedCount = ref(0)
 const csvHint = ref('')
 
 const form = reactive({
@@ -118,6 +120,8 @@ function onCsvUpload(event: Event) {
 async function onSubmit() {
   success.value = ''
   error.value = ''
+  lastFailedBatchId.value = ''
+  lastFailedCount.value = 0
   try {
     if (recipientCount.value === 0) {
       error.value =
@@ -161,12 +165,44 @@ async function onSubmit() {
     } else {
       const result = await sms.sendBulk(payload, channel.value)
       const summary = summarizeBulkSmsResult(result)
+      const failedCount = result.messages.filter((m) =>
+        m.status === 'FAILED' || m.status === 'REJECTED' || m.status === 'CANCELLED',
+      ).length
+      if (failedCount > 0) {
+        lastFailedBatchId.value = result.batchId
+        lastFailedCount.value = failedCount
+      }
       if (summary.ok) success.value = summary.text
       else error.value = summary.text
       await wallet.fetchBalance()
     }
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Campaign failed'
+  }
+}
+
+async function resendFailed() {
+  if (!lastFailedBatchId.value) return
+  if (!window.confirm(
+    `Resend only the ${lastFailedCount.value} failed recipient${lastFailedCount.value === 1 ? '' : 's'}? Already sent numbers will not be messaged again.`,
+  )) {
+    return
+  }
+  success.value = ''
+  error.value = ''
+  try {
+    const result = await sms.resendFailed(lastFailedBatchId.value, channel.value)
+    const summary = summarizeBulkSmsResult(result)
+    const failedCount = result.messages.filter((m) =>
+      m.status === 'FAILED' || m.status === 'REJECTED' || m.status === 'CANCELLED',
+    ).length
+    lastFailedBatchId.value = failedCount > 0 ? result.batchId : ''
+    lastFailedCount.value = failedCount
+    if (summary.ok) success.value = summary.text
+    else error.value = summary.text
+    await wallet.fetchBalance()
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : 'Resend failed'
   }
 }
 </script>
@@ -277,13 +313,24 @@ async function onSubmit() {
           <p v-if="success" class="text-sm text-emerald-700">{{ success }}</p>
           <p v-if="error" class="text-sm text-rose-600">{{ error }}</p>
 
-          <AppButton
-            type="submit"
-            :loading="sms.loading"
-            :disabled="!form.message || recipientCount === 0 || (form.sendLater && !form.scheduledAt)"
-          >
-            {{ form.sendLater ? 'Schedule reminder' : `Send ${channelLabel} campaign` }}
-          </AppButton>
+          <div class="flex flex-wrap items-center gap-3">
+            <AppButton
+              type="submit"
+              :loading="sms.loading"
+              :disabled="!form.message || recipientCount === 0 || (form.sendLater && !form.scheduledAt)"
+            >
+              {{ form.sendLater ? 'Schedule reminder' : `Send ${channelLabel} campaign` }}
+            </AppButton>
+            <AppButton
+              v-if="lastFailedBatchId"
+              type="button"
+              variant="secondary"
+              :loading="sms.loading"
+              @click="resendFailed"
+            >
+              Resend failed ({{ lastFailedCount }})
+            </AppButton>
+          </div>
         </form>
       </AppCard>
 

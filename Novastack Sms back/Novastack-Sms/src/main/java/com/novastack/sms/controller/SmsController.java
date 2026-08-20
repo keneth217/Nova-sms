@@ -102,6 +102,59 @@ public class SmsController {
         return ApiResponse.ok("Bulk SMS queued", data);
     }
 
+    @PostMapping("/batches/{batchId}/resend-failed")
+    @Operation(summary = "Resend failed recipients from a batch")
+    @Parameter(name = IDEMPOTENCY_HEADER, in = ParameterIn.HEADER, required = false)
+    public ApiResponse<BulkSmsResponse> resendFailed(
+            @PathVariable UUID batchId,
+            HttpServletRequest http) {
+        UUID orgId = SecurityUtils.requireOrganizationId();
+        UUID clientId = SecurityUtils.optionalApiClientId().orElse(null);
+        String idempotencyKey = http.getHeader(IDEMPOTENCY_HEADER);
+        String hash = IdempotencyService.hashPayload("resend-failed", batchId.toString());
+        BulkSmsResponse data = idempotencyService.replayOrRun(
+                clientId,
+                idempotencyKey,
+                hash,
+                IdempotencyService.TYPE_BATCH,
+                () -> {
+                    BulkSmsResponse sent = smsService.resendFailed(orgId, batchId);
+                    return new IdempotencyService.ReplayResult<>(sent, sent.getBatchId());
+                },
+                resourceId -> smsService.getBatchForOrganization(orgId, resourceId));
+        return ApiResponse.ok("Failed SMS resent", data);
+    }
+
+    @GetMapping("/batches/{batchId}")
+    @Operation(summary = "Get a bulk SMS batch and per-recipient statuses")
+    public ApiResponse<BulkSmsResponse> getBatch(@PathVariable UUID batchId) {
+        UUID orgId = SecurityUtils.requireOrganizationId();
+        return ApiResponse.ok(smsService.getBatchForOrganization(orgId, batchId));
+    }
+
+    @PostMapping("/{id}/resend")
+    @Operation(summary = "Resend a failed SMS")
+    @Parameter(name = IDEMPOTENCY_HEADER, in = ParameterIn.HEADER, required = false)
+    public ApiResponse<SmsMessageResponse> resend(
+            @PathVariable UUID id,
+            HttpServletRequest http) {
+        UUID orgId = SecurityUtils.requireOrganizationId();
+        UUID clientId = SecurityUtils.optionalApiClientId().orElse(null);
+        String idempotencyKey = http.getHeader(IDEMPOTENCY_HEADER);
+        String hash = IdempotencyService.hashPayload("resend", id.toString());
+        SmsMessageResponse data = idempotencyService.replayOrRun(
+                clientId,
+                idempotencyKey,
+                hash,
+                IdempotencyService.TYPE_SMS,
+                () -> {
+                    SmsMessageResponse sent = smsService.resend(orgId, id);
+                    return new IdempotencyService.ReplayResult<>(sent, sent.getId());
+                },
+                resourceId -> smsService.getForOrganization(orgId, resourceId));
+        return ApiResponse.ok("SMS resent", data);
+    }
+
     @PostMapping("/schedule")
     @Operation(summary = "Schedule SMS for later delivery",
             description = "Provide recipients and/or groupId, plus scheduledAt.")

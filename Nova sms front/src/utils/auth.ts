@@ -4,6 +4,7 @@ export function authUserFromResponse(auth: AuthResponse): AuthUser {
   return {
     userId: auth.userId,
     email: auth.email,
+    phone: auth.phone ?? null,
     fullName: auth.fullName,
     role: auth.role,
     organizationId: auth.organizationId,

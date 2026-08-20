@@ -39,20 +39,19 @@ public class ApiPermissionFilter extends OncePerRequestFilter {
             return;
         }
 
-        String path = request.getRequestURI();
+        String path = normalizeApiPath(request.getRequestURI());
         String method = request.getMethod();
         if (path == null) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        if (!path.startsWith("/api/v1/sms")) {
+        ApiPermission required = requiredPermission(method, path);
+        if (required == null) {
             writeForbidden(response, "This API key cannot access that resource");
             return;
         }
-
-        ApiPermission required = requiredPermission(method, path);
-        if (required != null && !principal.hasPermission(required)) {
+        if (!principal.hasPermission(required)) {
             writeForbidden(response, "API key is missing permission " + required.name());
             return;
         }
@@ -60,7 +59,31 @@ public class ApiPermissionFilter extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
     }
 
-    private static ApiPermission requiredPermission(String method, String path) {
+    static String normalizeApiPath(String uri) {
+        if (uri == null) {
+            return null;
+        }
+        int idx = uri.indexOf("/api/v1/");
+        return idx >= 0 ? uri.substring(idx) : uri;
+    }
+
+    /**
+     * Required permission for a scoped live key, or {@code null} if the path is not allowed.
+     */
+    static ApiPermission requiredPermission(String method, String path) {
+        if (path == null) {
+            return null;
+        }
+        if (path.startsWith("/api/v1/sms")) {
+            return requiredSmsPermission(method, path);
+        }
+        if (path.startsWith("/api/v1/wallet")) {
+            return requiredWalletPermission(method, path);
+        }
+        return null;
+    }
+
+    private static ApiPermission requiredSmsPermission(String method, String path) {
         if ("POST".equalsIgnoreCase(method) && path.endsWith("/sms/send")) {
             return ApiPermission.SMS_SEND;
         }
@@ -70,16 +93,36 @@ public class ApiPermissionFilter extends OncePerRequestFilter {
         if ("POST".equalsIgnoreCase(method) && path.endsWith("/sms/schedule")) {
             return ApiPermission.SMS_BULK;
         }
+        if ("POST".equalsIgnoreCase(method) && path.matches("/api/v1/sms/batches/[^/]+/resend-failed")) {
+            return ApiPermission.SMS_BULK;
+        }
+        if ("POST".equalsIgnoreCase(method) && path.matches("/api/v1/sms/[^/]+/resend")) {
+            return ApiPermission.SMS_SEND;
+        }
+        if ("GET".equalsIgnoreCase(method) && path.matches("/api/v1/sms/batches/[^/]+$")) {
+            return ApiPermission.SMS_STATUS;
+        }
         if ("GET".equalsIgnoreCase(method) && path.endsWith("/sms/history")) {
             return ApiPermission.SMS_HISTORY;
         }
         if ("GET".equalsIgnoreCase(method) && path.contains("/sms/") && path.endsWith("/status")) {
             return ApiPermission.SMS_STATUS;
         }
-        if ("GET".equalsIgnoreCase(method) && path.matches(".*/api/v1/sms/[^/]+$")) {
+        if ("GET".equalsIgnoreCase(method) && path.matches("/api/v1/sms/[^/]+$")) {
             return ApiPermission.SMS_STATUS;
         }
         return ApiPermission.SMS_SEND;
+    }
+
+    private static ApiPermission requiredWalletPermission(String method, String path) {
+        if (path.contains("/wallet/topup")) {
+            return ApiPermission.WALLET_TOPUP;
+        }
+        if ("GET".equalsIgnoreCase(method)
+                && (path.endsWith("/wallet/balance") || path.contains("/wallet/transactions"))) {
+            return ApiPermission.WALLET_READ;
+        }
+        return null;
     }
 
     private void writeForbidden(HttpServletResponse response, String message) throws IOException {

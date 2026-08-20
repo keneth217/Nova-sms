@@ -16,6 +16,7 @@ public class AuthResponse {
     private String tokenType;
     private UUID userId;
     private String email;
+    private String phone;
     private String fullName;
     private UserRole role;
     private UUID organizationId;

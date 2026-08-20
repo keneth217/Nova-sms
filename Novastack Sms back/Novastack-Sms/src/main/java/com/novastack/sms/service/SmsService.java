@@ -170,6 +170,74 @@ public class SmsService {
     }
 
     @Transactional
+    public BulkSmsResponse resendFailed(UUID organizationId, UUID batchId) {
+        return resendFailed(organizationId, batchId, MessageChannel.SMS);
+    }
+
+    @Transactional
+    public BulkSmsResponse resendFailed(UUID organizationId, UUID batchId, MessageChannel channel) {
+        MessageChannel resolved = channel == null ? MessageChannel.SMS : channel;
+        List<SmsMessage> original = smsMessageRepository.findByBatchIdAndOrganization_Id(batchId, organizationId)
+                .stream()
+                .filter(message -> sameChannel(message, resolved))
+                .toList();
+        if (original.isEmpty()) {
+            throw new ApiException("SMS batch not found", HttpStatus.NOT_FOUND);
+        }
+        List<SmsMessage> failed = original.stream()
+                .filter(message -> message.getStatus() != null && message.getStatus().isBillableFailure())
+                .toList();
+        if (failed.isEmpty()) {
+            throw new ApiException("No failed messages to resend", HttpStatus.BAD_REQUEST);
+        }
+        LinkedHashSet<String> recipients = failed.stream()
+                .map(SmsMessage::getRecipient)
+                .filter(recipient -> recipient != null && !recipient.isBlank())
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        if (recipients.isEmpty()) {
+            throw new ApiException("No failed messages to resend", HttpStatus.BAD_REQUEST);
+        }
+        SmsMessage template = failed.getFirst();
+        BulkSmsRequest request = new BulkSmsRequest();
+        request.setRecipients(new ArrayList<>(recipients));
+        request.setMessage(template.getContent());
+        request.setSenderId(template.getSenderId());
+        BulkSmsResponse sent = sendBulk(organizationId, request, resolved);
+        sent.setSourceBatchId(batchId);
+        sent.setResentCount(sent.getQueuedCount());
+        sent.setSkippedCount(original.size() - failed.size());
+        return sent;
+    }
+
+    @Transactional
+    public SmsMessageResponse resend(UUID organizationId, UUID messageId) {
+        return resend(organizationId, messageId, MessageChannel.SMS);
+    }
+
+    @Transactional
+    public SmsMessageResponse resend(UUID organizationId, UUID messageId, MessageChannel channel) {
+        MessageChannel resolved = channel == null ? MessageChannel.SMS : channel;
+        SmsMessage original = smsMessageRepository.findByIdAndOrganization_Id(messageId, organizationId)
+                .orElseThrow(() -> new ApiException("SMS message not found", HttpStatus.NOT_FOUND));
+        if (!sameChannel(original, resolved)) {
+            throw new ApiException("SMS message not found", HttpStatus.NOT_FOUND);
+        }
+        if (original.getStatus() == null || !original.getStatus().isBillableFailure()) {
+            throw new ApiException("Only failed messages can be resent", HttpStatus.BAD_REQUEST);
+        }
+        SendSmsRequest request = new SendSmsRequest();
+        request.setRecipient(original.getRecipient());
+        request.setMessage(original.getContent());
+        request.setSenderId(original.getSenderId());
+        return sendSingle(organizationId, request, resolved);
+    }
+
+    private static boolean sameChannel(SmsMessage message, MessageChannel channel) {
+        MessageChannel actual = message.getChannel() == null ? MessageChannel.SMS : message.getChannel();
+        return actual == channel;
+    }
+
+    @Transactional
     public BulkSmsResponse schedule(UUID organizationId, ScheduleSmsRequest request) {
         return schedule(organizationId, request, MessageChannel.SMS);
     }
@@ -271,17 +339,38 @@ public class SmsService {
 
     @Transactional(readOnly = true)
     public BulkSmsResponse getBatchForOrganization(UUID organizationId, UUID batchId) {
-        List<SmsMessage> messages = smsMessageRepository.findByBatchIdAndOrganization_Id(batchId, organizationId);
+        return getBatchForOrganization(organizationId, batchId, MessageChannel.SMS);
+    }
+
+    @Transactional(readOnly = true)
+    public BulkSmsResponse getBatchForOrganization(UUID organizationId, UUID batchId, MessageChannel channel) {
+        MessageChannel resolved = channel == null ? MessageChannel.SMS : channel;
+        List<SmsMessage> messages = smsMessageRepository.findByBatchIdAndOrganization_Id(batchId, organizationId)
+                .stream()
+                .filter(message -> sameChannel(message, resolved))
+                .toList();
         if (messages.isEmpty()) {
             throw new ApiException("SMS batch not found", HttpStatus.NOT_FOUND);
         }
         int units = messages.stream().mapToInt(SmsMessage::getSmsUnits).sum();
+        int failed = (int) messages.stream()
+                .filter(message -> message.getStatus() != null && message.getStatus().isBillableFailure())
+                .count();
+        boolean stillSending = messages.stream().anyMatch(message -> {
+            MessageStatus status = message.getStatus();
+            return status == MessageStatus.PENDING
+                    || status == MessageStatus.QUEUED
+                    || status == MessageStatus.PROCESSING
+                    || status == MessageStatus.SCHEDULED;
+        });
+        String status = stillSending ? "PROCESSING" : (failed == messages.size() ? "FAILED" : "COMPLETED");
         return BulkSmsResponse.builder()
                 .batchId(batchId)
                 .queuedCount(messages.size())
                 .recipientCount(messages.size())
                 .smsUnits(units)
-                .status("PROCESSING")
+                .status(status)
+                .failedCount(failed)
                 .messages(messages.stream().map(this::toResponse).toList())
                 .build();
     }

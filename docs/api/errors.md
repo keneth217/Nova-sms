@@ -61,7 +61,7 @@ A more detailed variant may include the required amount:
 
 HTTP **403**
 
-Wrong resource (not `/api/v1/sms/**`):
+Wrong resource (not `/api/v1/sms/**` or `/api/v1/wallet/**`):
 
 ```json
 {

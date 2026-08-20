@@ -11,6 +11,9 @@ import {
   BoltIcon,
   HeartIcon,
 } from '@heroicons/vue/24/outline'
+import JsonLd from '@/components/seo/JsonLd.vue'
+import { publicFaqs } from '@/data/public-faq'
+import { faqSchema, softwareApplicationSchema } from '@/seo/schema'
 
 const route = useRoute()
 
@@ -87,12 +90,21 @@ onMounted(async () => {
 
 <template>
   <div>
+    <JsonLd id="home-software" :data="softwareApplicationSchema()" />
+    <JsonLd id="home-faq" :data="faqSchema(publicFaqs)" />
     <section class="relative min-h-[78svh] overflow-hidden bg-[#fff7ed]">
-      <img
-        src="/girls.png"
-        alt="Friends reading a message together on a phone"
-        class="absolute inset-0 h-full w-full object-cover object-center"
-      />
+      <picture>
+        <source srcset="/girls.webp" type="image/webp" />
+        <img
+          src="/girls.png"
+          alt="People reading an SMS together on a phone, illustrating Nova SMS messaging in Kenya"
+          width="1672"
+          height="941"
+          fetchpriority="high"
+          decoding="async"
+          class="absolute inset-0 h-full w-full object-cover object-center"
+        />
+      </picture>
       <div
         class="absolute inset-0 bg-[linear-gradient(90deg,rgba(255,250,242,0.98)_0%,rgba(255,248,238,0.94)_36%,rgba(255,247,237,0.38)_66%,rgba(255,247,237,0.04)_100%)]"
       />
@@ -110,42 +122,42 @@ onMounted(async () => {
       <div
         class="relative mx-auto flex min-h-[78svh] max-w-6xl flex-col justify-center px-4 pb-14 pt-24 sm:px-6 lg:px-8"
       >
-        <p
+        <h1
           class="landing-fade-up font-serif text-5xl font-bold tracking-tight text-slate-900 sm:text-6xl lg:text-7xl"
         >
           Nova SMS
-        </p>
-        <h1
+        </h1>
+        <p
           class="landing-fade-up landing-delay-1 mt-5 max-w-2xl text-2xl font-semibold tracking-tight text-slate-800 sm:text-3xl"
         >
-          Send once for an event — or every day for your business.
-        </h1>
+          Bulk SMS gateway for Kenya — send once for an event, or every day for your business.
+        </p>
         <p
           class="landing-fade-up landing-delay-2 mt-4 max-w-xl text-base leading-relaxed text-slate-600 sm:text-lg"
         >
-          Families and organizers use Nova SMS for event and ceremony notices. Organizations use it for ongoing
-          campaigns. Create an account, top up with M-Pesa, send your messages — event accounts stay
-          active for one week.
+          Organizations, SACCOs, schools, and families use Nova SMS for campaigns and ceremony notices.
+          Create an account, top up with M-Pesa STK Push or Paybill, then send from the dashboard or the
+          REST API. Event accounts stay active for one week.
         </p>
         <div class="landing-fade-up landing-delay-3 mt-8 flex flex-wrap items-center gap-3">
           <RouterLink
-            to="/register?intent=event"
+            to="/register"
             class="rounded-lg bg-brand-600 px-5 py-3 text-sm font-semibold text-white shadow-sm shadow-brand-600/20 transition hover:bg-brand-700"
           >
-            Send for an event
+            Get started
+          </RouterLink>
+          <RouterLink
+            to="/developers"
+            class="rounded-lg border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-800 transition hover:border-slate-400 hover:bg-slate-50"
+          >
+            View documentation
           </RouterLink>
           <RouterLink
             to="/register?intent=business"
-            class="rounded-lg border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-800 transition hover:border-slate-400 hover:bg-slate-50"
-          >
-            Register business
-          </RouterLink>
-          <a
-            href="#events"
             class="text-sm font-medium text-brand-700 underline-offset-4 transition hover:underline"
           >
-            How short-term use works
-          </a>
+            Create account
+          </RouterLink>
         </div>
       </div>
     </section>
@@ -170,12 +182,18 @@ onMounted(async () => {
         </div>
         <div class="relative">
           <div class="absolute -inset-3 rounded-[2rem] bg-brand-100/60 blur-2xl" />
-          <img
-            src="/girls2.png"
-            alt="Friends sharing an SMS update on a phone"
-            loading="lazy"
-            class="relative aspect-[4/3] w-full rounded-3xl object-cover shadow-xl shadow-slate-900/10"
-          />
+          <picture>
+            <source srcset="/girls2.webp" type="image/webp" />
+            <img
+              src="/girls2.png"
+              alt="People sharing an SMS update on a phone after sending with Nova SMS"
+              width="1536"
+              height="1024"
+              loading="lazy"
+              decoding="async"
+              class="relative aspect-[4/3] w-full rounded-3xl object-cover shadow-xl shadow-slate-900/10"
+            />
+          </picture>
         </div>
       </div>
     </section>
@@ -195,12 +213,18 @@ onMounted(async () => {
               have to come back.
             </p>
           </div>
-          <img
-            src="/girls3.png"
-            alt="Happy event organizer celebrating after sending an update"
-            loading="lazy"
-            class="aspect-[16/10] w-full rounded-3xl object-cover shadow-lg shadow-slate-900/10 lg:order-1"
-          />
+          <picture>
+            <source srcset="/girls3.webp" type="image/webp" />
+            <img
+              src="/girls3.png"
+              alt="Event organizer celebrating after sending SMS updates with Nova SMS"
+              width="1536"
+              height="1024"
+              loading="lazy"
+              decoding="async"
+              class="aspect-[16/10] w-full rounded-3xl object-cover shadow-lg shadow-slate-900/10 lg:order-1"
+            />
+          </picture>
         </div>
 
         <div class="mt-12 grid gap-10 sm:grid-cols-3">
@@ -256,12 +280,18 @@ onMounted(async () => {
               Whether you send once for an event or run monthly campaigns, the same tools apply.
             </p>
           </div>
-          <img
-            src="/girls4.png"
-            alt="A successful sender celebrating with her phone"
-            loading="lazy"
-            class="aspect-[16/9] w-full rounded-3xl object-cover object-center shadow-lg shadow-slate-900/10"
-          />
+          <picture>
+            <source srcset="/girls4.webp" type="image/webp" />
+            <img
+              src="/girls4.png"
+              alt="A sender checking a successful Nova SMS delivery on her phone"
+              width="1536"
+              height="1024"
+              loading="lazy"
+              decoding="async"
+              class="aspect-[16/9] w-full rounded-3xl object-cover object-center shadow-lg shadow-slate-900/10"
+            />
+          </picture>
         </div>
 
         <div class="mt-12 grid gap-x-10 gap-y-12 sm:grid-cols-2 lg:grid-cols-3">
@@ -275,6 +305,99 @@ onMounted(async () => {
             <p class="mt-2 text-sm leading-relaxed text-slate-600">{{ feature.description }}</p>
           </article>
         </div>
+      </div>
+    </section>
+
+    <section class="border-t border-slate-200 bg-[#f4f7f6]">
+      <div class="mx-auto max-w-6xl px-4 py-20 sm:px-6 lg:px-8">
+        <p class="text-sm font-semibold uppercase tracking-wider text-brand-700">Platform</p>
+        <h2 class="mt-2 font-serif text-3xl font-bold text-slate-900 sm:text-4xl">
+          M-Pesa top-up, APIs, and prepaid sending
+        </h2>
+        <p class="mt-3 max-w-2xl text-slate-600">
+          Nova SMS is a messaging platform. M-Pesa STK Push and Paybill C2B fund the SMS wallet.
+          Developers send SMS and start top-ups through the REST API.
+        </p>
+        <div class="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          <article class="rounded-2xl border border-slate-200 bg-white p-6">
+            <h3 class="text-lg font-semibold text-slate-900">M-Pesa STK Push</h3>
+            <p class="mt-2 text-sm text-slate-600">
+              Send a Lipa na M-Pesa prompt to a phone and credit the organization wallet once the PIN
+              succeeds.
+            </p>
+            <RouterLink to="/mpesa-stk-push" class="mt-4 inline-block text-sm font-medium text-brand-700 hover:underline">
+              Learn about M-Pesa STK Push
+            </RouterLink>
+          </article>
+          <article class="rounded-2xl border border-slate-200 bg-white p-6">
+            <h3 class="text-lg font-semibold text-slate-900">Paybill C2B</h3>
+            <p class="mt-2 text-sm text-slate-600">
+              Pay the platform Paybill using your organization account reference. Nova SMS credits
+              that wallet from the Safaricom confirmation.
+            </p>
+            <RouterLink to="/mpesa-paybill" class="mt-4 inline-block text-sm font-medium text-brand-700 hover:underline">
+              Learn about M-Pesa Paybill C2B
+            </RouterLink>
+          </article>
+          <article class="rounded-2xl border border-slate-200 bg-white p-6">
+            <h3 class="text-lg font-semibold text-slate-900">Developer API</h3>
+            <p class="mt-2 text-sm text-slate-600">
+              Authenticate with an API key from your backend. Send SMS, read delivery status, and
+              start STK top-ups.
+            </p>
+            <RouterLink to="/sms-api" class="mt-4 inline-block text-sm font-medium text-brand-700 hover:underline">
+              Nova SMS API for developers
+            </RouterLink>
+          </article>
+          <article class="rounded-2xl border border-slate-200 bg-white p-6">
+            <h3 class="text-lg font-semibold text-slate-900">Callbacks and status</h3>
+            <p class="mt-2 text-sm text-slate-600">
+              Safaricom callbacks land on Nova SMS. Poll wallet status so delayed PIN entry does not
+              desync your app.
+            </p>
+            <RouterLink to="/webhooks" class="mt-4 inline-block text-sm font-medium text-brand-700 hover:underline">
+              How payment callbacks work
+            </RouterLink>
+          </article>
+          <article class="rounded-2xl border border-slate-200 bg-white p-6">
+            <h3 class="text-lg font-semibold text-slate-900">Security</h3>
+            <p class="mt-2 text-sm text-slate-600">
+              Dashboard JWT sessions, hashed API keys, permission scopes, and once-only wallet
+              credits per M-Pesa receipt.
+            </p>
+            <RouterLink to="/about" class="mt-4 inline-block text-sm font-medium text-brand-700 hover:underline">
+              About Nova SMS
+            </RouterLink>
+          </article>
+          <article class="rounded-2xl border border-slate-200 bg-white p-6">
+            <h3 class="text-lg font-semibold text-slate-900">Prepaid pricing</h3>
+            <p class="mt-2 text-sm text-slate-600">
+              Top up in KES, then each SMS is deducted from the wallet at the organization rate. No
+              post-pay invoice in the current product.
+            </p>
+            <RouterLink to="/pricing" class="mt-4 inline-block text-sm font-medium text-brand-700 hover:underline">
+              How prepaid pricing works
+            </RouterLink>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="faq" class="scroll-mt-20 border-t border-slate-200 bg-white">
+      <div class="mx-auto max-w-3xl px-4 py-20 sm:px-6 lg:px-8">
+        <p class="text-sm font-semibold uppercase tracking-wider text-brand-700">FAQ</p>
+        <h2 class="mt-2 font-serif text-3xl font-bold text-slate-900">Common questions</h2>
+        <dl class="mt-10 space-y-8">
+          <div v-for="item in publicFaqs" :key="item.question">
+            <dt class="text-lg font-semibold text-slate-900">{{ item.question }}</dt>
+            <dd class="mt-2 text-sm leading-relaxed text-slate-600">{{ item.answer }}</dd>
+          </div>
+        </dl>
+        <p class="mt-8 text-sm">
+          <RouterLink to="/faq" class="font-medium text-brand-700 hover:underline">
+            Open the full FAQ page
+          </RouterLink>
+        </p>
       </div>
     </section>
 
@@ -296,16 +419,16 @@ onMounted(async () => {
         </div>
         <div class="mt-6 flex flex-wrap gap-3 lg:mt-0">
           <RouterLink
-            to="/register?intent=event"
+            to="/register"
             class="rounded-lg bg-white px-5 py-3 text-sm font-semibold text-brand-800 transition hover:bg-teal-50"
           >
-            Event account
+            Get started
           </RouterLink>
           <RouterLink
-            to="/login"
+            to="/developers"
             class="rounded-lg border border-white/40 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10"
           >
-            Login
+            View documentation
           </RouterLink>
         </div>
       </div>

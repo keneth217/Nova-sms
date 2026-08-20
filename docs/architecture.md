@@ -28,7 +28,7 @@ Nova SMS is one application with two faces:
 
 ## What integrating applications see
 
-External apps call Nova SMS REST endpoints under `/api/v1/sms/**`. They receive Nova SMS message UUIDs, Nova SMS statuses, and Nova SMS error messages.
+External apps call Nova SMS REST endpoints under `/api/v1/sms/**`. With `WALLET_READ` / `WALLET_TOPUP` they can also call `/api/v1/wallet/**` to show balance and accept M-Pesa top-ups on their own site. They receive Nova SMS message UUIDs, Nova SMS statuses, and Nova SMS error messages.
 
 They do **not** need a TalkSasa account, token, or sender configuration. Nova SMS selects the configured provider and maps provider results into Nova statuses.
 

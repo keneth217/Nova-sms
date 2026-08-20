@@ -21,13 +21,19 @@ public interface OrganizationRepository extends JpaRepository<Organization, UUID
 
     boolean existsByEmailIgnoreCase(String email);
 
+    boolean existsByEmailIgnoreCaseAndIdNot(String email, UUID id);
+
     boolean existsByPhone(String phone);
+
+    boolean existsByPhoneAndIdNot(String phone, UUID id);
 
     Optional<Organization> findByPhone(String phone);
 
     Optional<Organization> findByApiKeyAndStatus(String apiKey, OrganizationStatus status);
 
     Optional<Organization> findByMpesaAccountRefIgnoreCase(String mpesaAccountRef);
+
+    boolean existsByMpesaAccountRefIgnoreCase(String mpesaAccountRef);
 
     Page<Organization> findByStatus(OrganizationStatus status, Pageable pageable);
 

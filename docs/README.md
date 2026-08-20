@@ -8,7 +8,7 @@ Integrating applications (Mwalimu Scheme, Chamaplus, Nova POS, SACCO and school 
 
 1. [Architecture](architecture.md) — how SaaS users and API clients share one SMS engine
 2. [Authentication](authentication.md) — `X-API-Key` live keys
-3. [API reference](api/README.md) — send, bulk, status, history, errors
+3. [API reference](api/README.md) — send, bulk, status, history, wallet, errors
 4. [Integration guides](integration/README.md) — Spring Boot, Node.js, PHP, Python, generic HTTP
 
 Internal operator notes (not for integrating developers):

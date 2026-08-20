@@ -68,6 +68,16 @@ public class Organization {
     @Builder.Default
     private BigDecimal smsCost = new BigDecimal("1.00");
 
+    /** Alert when wallet balance crosses from above this amount to at-or-below it. */
+    @Column(name = "low_balance_threshold", nullable = false, precision = 14, scale = 4)
+    @Builder.Default
+    private BigDecimal lowBalanceThreshold = new BigDecimal("50.00");
+
+    /** Welcome, top-up, and low-balance SMS to the org phone. Platform flag can still disable all. */
+    @Column(name = "notifications_enabled", nullable = false)
+    @Builder.Default
+    private boolean notificationsEnabled = true;
+
     @Column(name = "at_username", length = 100)
     private String atUsername;
 

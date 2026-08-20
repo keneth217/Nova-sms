@@ -7,14 +7,66 @@ import type {
   PlatformOverview,
   TalkSasaAccount,
   PlatformBilling,
+  PlatformNotificationSettings,
+  C2bCallbackUrls,
 } from '@/models/organization.model'
 import type { User } from '@/models/user.model'
-import type { TopupStatus, WalletTransaction } from '@/models/wallet.model'
+import type { TopupStatus, StkPushResponse, WalletTransaction, MpesaReceiptLookup } from '@/models/wallet.model'
+import type { PaybillCollectionDashboard } from '@/models/collection.model'
 
 class OrganizationService {
   async getCurrent(): Promise<Organization> {
     const { data } = await api.get<ApiResponse<Organization>>('/organizations/me')
     if (!data.success || !data.data) throw new Error(data.message || 'Failed to load organization')
+    return data.data
+  }
+
+  async updateSettings(payload: {
+    name?: string
+    email?: string
+    phone?: string
+    notificationsEnabled: boolean
+    lowBalanceThreshold: number
+  }): Promise<Organization> {
+    const { data } = await api.patch<ApiResponse<Organization>>('/organizations/me/settings', payload)
+    if (!data.success || !data.data) throw new Error(data.message || 'Failed to save settings')
+    return data.data
+  }
+
+  async getNotificationSettings(): Promise<PlatformNotificationSettings> {
+    const { data } = await api.get<ApiResponse<PlatformNotificationSettings>>('/admin/notifications')
+    if (!data.success || !data.data) throw new Error(data.message || 'Failed to load notification settings')
+    return data.data
+  }
+
+  async updateNotificationSettings(payload: {
+    enabled?: boolean
+    lowBalanceThreshold?: number
+    portalUrl?: string
+    welcomeTemplate?: string
+    topupTemplate?: string
+    collectionTemplate?: string
+    lowBalanceTemplate?: string
+    platformTopupTemplate?: string
+    providerLowTemplate?: string
+    providerExposureTemplate?: string
+    collectionAccounts?: string[]
+    collectionNotifyPhones?: string[]
+  }): Promise<PlatformNotificationSettings> {
+    const { data } = await api.put<ApiResponse<PlatformNotificationSettings>>('/admin/notifications', payload)
+    if (!data.success || !data.data) throw new Error(data.message || 'Failed to save SMS settings')
+    return data.data
+  }
+
+  async getC2bUrls(): Promise<C2bCallbackUrls> {
+    const { data } = await api.get<ApiResponse<C2bCallbackUrls>>('/admin/mpesa/c2b/urls')
+    if (!data.success || !data.data) throw new Error(data.message || 'Failed to load C2B URLs')
+    return data.data
+  }
+
+  async registerC2bUrls(): Promise<C2bCallbackUrls> {
+    const { data } = await api.post<ApiResponse<C2bCallbackUrls>>('/admin/mpesa/c2b/register')
+    if (!data.success || !data.data) throw new Error(data.message || 'Failed to register C2B URLs')
     return data.data
   }
 
@@ -41,7 +93,7 @@ class OrganizationService {
   }
 
   async getOverview(): Promise<PlatformOverview> {
-    const { data } = await api.get<ApiResponse<Record<string, number>>>('/admin/overview')
+    const { data } = await api.get<ApiResponse<PlatformOverview>>('/admin/overview')
     if (!data.success || !data.data) throw new Error(data.message || 'Failed to load overview')
     const raw = data.data
     return {
@@ -51,6 +103,10 @@ class OrganizationService {
       totalSmsSent: Number(raw.totalSmsSent ?? 0),
       pendingSenderIds: Number(raw.pendingSenderIds ?? 0),
       pendingTopups: Number(raw.pendingTopups ?? 0),
+      totalOrgWalletBalance: Number(raw.totalOrgWalletBalance ?? 0),
+      currency: raw.currency || 'KES',
+      lowBalanceThreshold:
+        raw.lowBalanceThreshold == null ? null : Number(raw.lowBalanceThreshold),
     }
   }
 
@@ -99,6 +155,44 @@ class OrganizationService {
       params,
     })
     if (!data.success || !data.data) throw new Error(data.message || 'Failed to load top-ups')
+    return data.data
+  }
+
+  async getCollections(
+    params: PageRequest & { billRef?: string } = {},
+  ): Promise<PaybillCollectionDashboard> {
+    const { data } = await api.get<ApiResponse<PaybillCollectionDashboard>>('/admin/collections', {
+      params,
+    })
+    if (!data.success || !data.data) throw new Error(data.message || 'Failed to load collections')
+    return data.data
+  }
+
+  async checkTopup(transactionId: string): Promise<StkPushResponse> {
+    const { data } = await api.post<ApiResponse<StkPushResponse>>(`/admin/topups/${transactionId}/check`)
+    if (!data.success || !data.data) throw new Error(data.message || 'Failed to query Safaricom')
+    return data.data
+  }
+
+  async verifyTopupReceipt(mpesaReceipt: string): Promise<MpesaReceiptLookup> {
+    const { data } = await api.post<ApiResponse<MpesaReceiptLookup>>('/admin/topups/verify-receipt', {
+      mpesaReceipt: mpesaReceipt.trim(),
+    })
+    if (!data.success || !data.data) throw new Error(data.message || 'Failed to verify receipt')
+    return data.data
+  }
+
+  async creditTopupReceipt(payload: {
+    mpesaReceipt: string
+    accountNumber?: string
+    amount?: number
+  }): Promise<MpesaReceiptLookup> {
+    const { data } = await api.post<ApiResponse<MpesaReceiptLookup>>('/admin/topups/credit-receipt', {
+      mpesaReceipt: payload.mpesaReceipt.trim(),
+      accountNumber: payload.accountNumber?.trim() || undefined,
+      amount: payload.amount,
+    })
+    if (!data.success || !data.data) throw new Error(data.message || 'Failed to credit receipt')
     return data.data
   }
 }

@@ -83,6 +83,7 @@ public class SecurityConfig {
                                 "/api/v1/organizations/register",
                                 "/api/v1/dlr/**",
                                 "/api/v1/mpesa/**",
+                                "/api/v1/payments/**",
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",

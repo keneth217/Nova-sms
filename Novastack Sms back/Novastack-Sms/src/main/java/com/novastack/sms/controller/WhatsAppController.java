@@ -51,6 +51,28 @@ public class WhatsAppController {
         return ApiResponse.ok("Bulk WhatsApp queued", smsService.sendBulk(orgId, request, MessageChannel.WHATSAPP));
     }
 
+    @PostMapping("/batches/{batchId}/resend-failed")
+    @Operation(summary = "Resend only failed WhatsApp recipients from a batch")
+    public ApiResponse<BulkSmsResponse> resendFailed(@PathVariable UUID batchId) {
+        UUID orgId = SecurityUtils.requireOrganizationId();
+        return ApiResponse.ok("Failed WhatsApp resent",
+                smsService.resendFailed(orgId, batchId, MessageChannel.WHATSAPP));
+    }
+
+    @GetMapping("/batches/{batchId}")
+    @Operation(summary = "Get a WhatsApp batch and per-recipient statuses")
+    public ApiResponse<BulkSmsResponse> getBatch(@PathVariable UUID batchId) {
+        UUID orgId = SecurityUtils.requireOrganizationId();
+        return ApiResponse.ok(smsService.getBatchForOrganization(orgId, batchId, MessageChannel.WHATSAPP));
+    }
+
+    @PostMapping("/{id}/resend")
+    @Operation(summary = "Resend a single failed WhatsApp message")
+    public ApiResponse<SmsMessageResponse> resend(@PathVariable UUID id) {
+        UUID orgId = SecurityUtils.requireOrganizationId();
+        return ApiResponse.ok("WhatsApp resent", smsService.resend(orgId, id, MessageChannel.WHATSAPP));
+    }
+
     @PostMapping("/schedule")
     @Operation(summary = "Schedule WhatsApp for later delivery")
     public ApiResponse<BulkSmsResponse> schedule(@Valid @RequestBody ScheduleSmsRequest request) {

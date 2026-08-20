@@ -77,6 +77,12 @@ async function changePassword() {
             </dd>
           </div>
           <div class="flex justify-between gap-4 border-b border-slate-100 pb-3">
+            <dt class="text-slate-500">Phone</dt>
+            <dd class="font-medium text-slate-900">
+              {{ auth.profile?.phone || auth.user?.phone || '—' }}
+            </dd>
+          </div>
+          <div class="flex justify-between gap-4 border-b border-slate-100 pb-3">
             <dt class="text-slate-500">Role</dt>
             <dd>
               <StatusBadge variant="brand">

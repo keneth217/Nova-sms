@@ -1,6 +1,7 @@
 package com.novastack.sms.controller;
 
 import com.novastack.sms.dto.request.OrganizationRegisterRequest;
+import com.novastack.sms.dto.request.OrganizationSettingsRequest;
 import com.novastack.sms.dto.response.ApiResponse;
 import com.novastack.sms.dto.response.OrganizationResponse;
 import com.novastack.sms.service.AuthService;
@@ -10,6 +11,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -35,5 +37,11 @@ public class OrganizationController {
     @Operation(summary = "Get the authenticated organization's details")
     public ApiResponse<OrganizationResponse> currentOrganization() {
         return ApiResponse.ok(authService.getCurrentOrganization());
+    }
+
+    @PatchMapping("/me/settings")
+    @Operation(summary = "Update organization details and SMS notification settings")
+    public ApiResponse<OrganizationResponse> updateSettings(@Valid @RequestBody OrganizationSettingsRequest request) {
+        return ApiResponse.ok("Settings saved", authService.updateSettings(request));
     }
 }

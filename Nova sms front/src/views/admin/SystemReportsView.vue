@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import {
   BuildingOffice2Icon,
   IdentificationIcon,
@@ -9,6 +9,7 @@ import {
   ShieldCheckIcon,
   SignalIcon,
   CurrencyDollarIcon,
+  WalletIcon,
 } from '@heroicons/vue/24/outline'
 import { useOrganizationStore } from '@/stores/organization.store'
 import { organizationService } from '@/api/organization.service'
@@ -66,6 +67,37 @@ function remainingLabel(account: TalkSasaAccount | null) {
   if (remaining == null) return '—'
   return formatNumber(Number(remaining))
 }
+
+const talksasaRemaining = computed(() => talksasa.value?.balance?.remainingUnits)
+const talksasaThreshold = computed(() => org.overview?.lowBalanceThreshold)
+const talksasaBelowThreshold = computed(() => {
+  const remaining = talksasaRemaining.value
+  const threshold = talksasaThreshold.value
+  if (remaining == null || threshold == null) return false
+  return Number(remaining) <= Number(threshold)
+})
+const talksasaUnitsTone = computed(() => {
+  if (!talksasa.value?.reachable) return 'danger'
+  if (talksasaBelowThreshold.value) return 'warning'
+  return 'success'
+})
+const talksasaUnitsHint = computed(() => {
+  if (!talksasa.value) return ''
+  if (!talksasa.value.reachable) return talksasa.value.errorMessage || 'Unreachable'
+  const threshold = talksasaThreshold.value
+  if (talksasaRemaining.value != null && threshold != null) {
+    return talksasaBelowThreshold.value
+      ? `At or below threshold of ${formatNumber(Number(threshold))}`
+      : `Above threshold of ${formatNumber(Number(threshold))}`
+  }
+  return talksasa.value.profile?.name || talksasa.value.profile?.email || 'Connected'
+})
+const walletsExceedTalksasa = computed(() => {
+  const wallets = org.overview?.totalOrgWalletBalance
+  const remaining = talksasaRemaining.value
+  if (wallets == null || remaining == null) return false
+  return Number(wallets) > Number(remaining)
+})
 
 async function saveBilling() {
   billingMessage.value = ''
@@ -126,6 +158,17 @@ async function saveBilling() {
         :value="formatNumber(org.overview?.pendingTopups ?? 0)"
         :icon="BanknotesIcon"
         tone="warning"
+      />
+      <StatCard
+        label="Total org wallets"
+        :value="formatCurrency(org.overview?.totalOrgWalletBalance ?? 0, org.overview?.currency)"
+        :hint="
+          walletsExceedTalksasa
+            ? 'Greater than TalkSasa remaining units — owner alert fires once'
+            : 'Sum of every organization wallet'
+        "
+        :icon="WalletIcon"
+        :tone="walletsExceedTalksasa ? 'warning' : 'brand'"
       />
     </div>
 
@@ -226,13 +269,9 @@ async function saveBilling() {
           <StatCard
             label="TalkSasa SMS units"
             :value="remainingLabel(talksasa)"
-            :hint="
-              talksasa.reachable
-                ? talksasa.profile?.name || talksasa.profile?.email || 'Connected'
-                : talksasa.errorMessage || 'Unreachable'
-            "
+            :hint="talksasaUnitsHint"
             :icon="SignalIcon"
-            :tone="talksasa.reachable ? 'success' : 'danger'"
+            :tone="talksasaUnitsTone"
           />
           <div class="sm:col-span-1 xl:col-span-3 text-sm text-slate-600">
             <p>
@@ -254,6 +293,24 @@ async function saveBilling() {
               Used {{ formatNumber(Number(talksasa.balance.usedUnits)) }}
               <span v-if="talksasa.balance.totalUnits != null">
                 of {{ formatNumber(Number(talksasa.balance.totalUnits)) }}
+              </span>
+            </p>
+            <p v-if="talksasaRemaining != null && talksasaThreshold != null" class="mt-2 text-sm" :class="talksasaBelowThreshold ? 'text-rose-700' : 'text-slate-600'">
+              Remaining {{ formatNumber(Number(talksasaRemaining)) }} units versus Super Admin threshold {{ formatNumber(Number(talksasaThreshold)) }}.
+              <span v-if="talksasaBelowThreshold" class="font-medium">
+                Owner notify phones are alerted once until TalkSasa units recover.
+              </span>
+            </p>
+            <p
+              v-if="talksasaRemaining != null && org.overview"
+              class="mt-2 text-sm"
+              :class="walletsExceedTalksasa ? 'text-rose-700' : 'text-slate-600'"
+            >
+              Organization wallets
+              {{ formatCurrency(org.overview.totalOrgWalletBalance ?? 0, org.overview.currency) }}
+              versus TalkSasa remaining {{ formatNumber(Number(talksasaRemaining)) }} units.
+              <span v-if="walletsExceedTalksasa" class="font-medium">
+                Owner notify phones are alerted once until TalkSasa units cover the wallet total.
               </span>
             </p>
             <p class="mt-2 text-xs text-slate-400">

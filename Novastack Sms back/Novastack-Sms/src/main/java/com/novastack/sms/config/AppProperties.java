@@ -5,6 +5,8 @@ import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
 
 @Getter
 @Setter
@@ -19,6 +21,7 @@ public class AppProperties {
     private DataBundles dataBundles = new DataBundles();
     private SuperAdmin superAdmin = new SuperAdmin();
     private OrganizationDefaults organization = new OrganizationDefaults();
+    private Notifications notifications = new Notifications();
 
     @Getter
     @Setter
@@ -44,6 +47,7 @@ public class AppProperties {
         private Pricing pricing = new Pricing();
         private Billing billing = new Billing();
         private StatusSync statusSync = new StatusSync();
+        private ProviderUnitsAlert providerUnitsAlert = new ProviderUnitsAlert();
         private TalkSasa talksasa = new TalkSasa();
     }
 
@@ -69,6 +73,13 @@ public class AppProperties {
         private boolean enabled = true;
         private String cron = "0 */5 * * * *";
         private int batchSize = 50;
+    }
+
+    @Getter
+    @Setter
+    public static class ProviderUnitsAlert {
+        private boolean enabled = true;
+        private String cron = "0 */10 * * * *";
     }
 
     @Getter
@@ -116,6 +127,13 @@ public class AppProperties {
         private String baseUrl = "https://api.safaricom.co.ke";
         private String accountReferencePrefix = "NOVA";
         private String transactionDesc = "Novastack SMS wallet top-up";
+        /**
+         * Paybill account numbers that are recorded for stats only.
+         * They never credit an organization wallet.
+         */
+        private List<String> collectionAccounts = new ArrayList<>();
+        /** Phones notified when a collection account is paid. Not billed to any org. */
+        private List<String> collectionNotifyPhones = new ArrayList<>();
     }
 
     @Getter
@@ -156,6 +174,7 @@ public class AppProperties {
         private String email = "kipyegonkeneth03@gmail.com";
         private String password = "Designer@3689.";
         private String fullName = "Keneth Kipyegon";
+        private String phone = "0711766223";
     }
 
     @Getter
@@ -163,5 +182,35 @@ public class AppProperties {
     public static class OrganizationDefaults {
         /** How long EVENT accounts stay active after registration. */
         private int eventActiveDays = 7;
+    }
+
+    @Getter
+    @Setter
+    public static class Notifications {
+        /** Platform SMS to org phone: welcome, top-up receipt, low-balance. Not billed to the org. */
+        private boolean enabled = true;
+        /** Alert when wallet balance crosses from above this amount to at-or-below it. */
+        private BigDecimal lowBalanceThreshold = new BigDecimal("50.00");
+        private String portalUrl = "https://novasms.novastack.co.ke";
+        private Templates templates = new Templates();
+    }
+
+    @Getter
+    @Setter
+    public static class Templates {
+        private String welcome =
+                "Welcome to Nova SMS, {name}! Your organization account is ready. Top up your wallet via M-Pesa to start sending SMS. {portalUrl}";
+        private String topup =
+                "Nova SMS: KES {amount} credited to your wallet.{receipt} New balance: KES {balance}.";
+        private String collection =
+                "KES {amount} has been received from {payer} for {account}.{receipt}";
+        private String lowBalance =
+                "Nova SMS: Your wallet balance is low (KES {balance}). Top up via M-Pesa to keep sending SMS.";
+        private String platformTopup =
+                "Nova SMS: {name} ({account}) topped up KES {amount}.{receipt} Bal KES {balance}. {time}";
+        private String providerLow =
+                "Nova SMS: TalkSasa remaining {units} units. Threshold {threshold}. Top up the provider account.";
+        private String providerExposure =
+                "Nova SMS: Org wallets KES {wallets} exceed TalkSasa {units} units. Top up the provider account.";
     }
 }

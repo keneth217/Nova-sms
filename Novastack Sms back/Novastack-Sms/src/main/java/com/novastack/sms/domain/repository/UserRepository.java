@@ -38,6 +38,8 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     boolean existsByEmailIgnoreCase(String email);
 
+    java.util.List<User> findByOrganizationId(UUID organizationId);
+
     long countByOrganizationId(UUID organizationId);
 
     @Query("""

@@ -18,6 +18,10 @@ export interface Organization {
   walletId?: string | null
   walletBalance?: number | null
   walletCurrency?: string | null
+  notificationsEnabled?: boolean | null
+  lowBalanceThreshold?: number | null
+  platformNotificationsEnabled?: boolean | null
+  platformLowBalanceThreshold?: number | null
 }
 
 export interface AdminOrganization extends Organization {
@@ -35,6 +39,39 @@ export interface PlatformOverview {
   revenue?: number
   pendingSenderIds?: number
   pendingTopups?: number
+  totalOrgWalletBalance?: number
+  currency?: string
+  lowBalanceThreshold?: number | null
+}
+
+export interface PlatformNotificationSettings {
+  enabled: boolean
+  lowBalanceThreshold: number
+  portalUrl?: string | null
+  welcomeTemplate?: string | null
+  topupTemplate?: string | null
+  collectionTemplate?: string | null
+  lowBalanceTemplate?: string | null
+  platformTopupTemplate?: string | null
+  providerLowTemplate?: string | null
+  providerExposureTemplate?: string | null
+  talksasaLastRemaining?: number | null
+  talksasaLowAlerted?: boolean | null
+  talksasaExposureAlerted?: boolean | null
+  collectionAccounts?: string[] | null
+  collectionNotifyPhones?: string[] | null
+}
+
+export interface C2bCallbackUrls {
+  shortcode?: string
+  responseType?: string
+  confirmationUrl: string
+  validationUrl: string
+  success?: string
+  alreadyRegistered?: string
+  errorCode?: string
+  message?: string
+  darajaResponse?: string
 }
 
 export interface PlatformBilling {

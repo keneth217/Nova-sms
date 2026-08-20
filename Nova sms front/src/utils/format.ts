@@ -1,3 +1,5 @@
+import { isBillableFailure } from '@/models/sms.model'
+
 export function formatCurrency(amount: number, currency = 'KES'): string {
   return new Intl.NumberFormat('en-KE', {
     style: 'currency',
@@ -156,8 +158,8 @@ export function summarizeBulkSmsResult(result: {
   batchId: string
   messages: Array<{ status: string; recipient: string; failureReason?: string | null }>
 }): { ok: boolean; text: string } {
-  const failed = result.messages.filter((m) => m.status === 'FAILED')
-  const sent = result.messages.filter((m) => m.status !== 'FAILED')
+  const failed = result.messages.filter((m) => isBillableFailure(m.status))
+  const sent = result.messages.filter((m) => !isBillableFailure(m.status))
 
   if (failed.length === 0) {
     return {

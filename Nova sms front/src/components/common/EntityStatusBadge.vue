@@ -50,7 +50,10 @@ function variantFor(status: string): Variant {
       return 'info'
     case 'REFUND':
     case 'ADJUSTMENT':
+    case 'STK_PUSH':
       return 'brand'
+    case 'PAYBILL':
+      return 'info'
     default:
       return 'neutral'
   }

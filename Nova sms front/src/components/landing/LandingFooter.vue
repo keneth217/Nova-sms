@@ -4,17 +4,21 @@ import { RouterLink } from 'vue-router'
 const year = new Date().getFullYear()
 
 const productLinks = [
-  { to: '/#features', label: 'Features' },
-  { to: '/#events', label: 'Event sending' },
-  { to: '/register?intent=event', label: 'Get started' },
-  { to: '/login', label: 'Sign in' },
-  { to: '/developers', label: 'API docs' },
+  { to: '/sms-gateway', label: 'Bulk SMS gateway' },
+  { to: '/mpesa-stk-push', label: 'M-Pesa STK Push' },
+  { to: '/mpesa-paybill', label: 'Paybill C2B' },
+  { to: '/webhooks', label: 'Callbacks and status' },
+  { to: '/sms-api', label: 'Developer API' },
+  { to: '/developers', label: 'API documentation' },
+  { to: '/pricing', label: 'Pricing' },
 ]
 
 const resourceLinks = [
-  { to: '/register?intent=event', label: 'Event / one-time account' },
-  { to: '/register?intent=business', label: 'Business account' },
-  { to: '/login', label: 'Customer login' },
+  { to: '/about', label: 'About' },
+  { to: '/faq', label: 'FAQ' },
+  { to: '/contact', label: 'Contact' },
+  { to: '/register', label: 'Create account' },
+  { to: '/data-bundles', label: 'Data bundles' },
 ]
 
 const legalLinks = [
@@ -38,8 +42,8 @@ const legalLinks = [
             <span class="font-serif text-lg font-bold text-white">Nova SMS</span>
           </RouterLink>
           <p class="mt-4 max-w-sm text-sm leading-relaxed text-slate-400">
-            Bulk SMS for businesses — and for people who only need to send once. Event notices,
-            weddings, harambees, or daily campaigns. Top up with M-Pesa and send.
+            Bulk SMS for Kenyan businesses and events. Prepaid wallet, M-Pesa STK Push and Paybill
+            top-up, delivery reports, and a REST API.
           </p>
         </div>
 
@@ -55,7 +59,7 @@ const legalLinks = [
         </div>
 
         <div>
-          <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Account</p>
+          <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Resources</p>
           <ul class="mt-4 space-y-2.5">
             <li v-for="link in resourceLinks" :key="link.label">
               <RouterLink :to="link.to" class="text-sm transition hover:text-white">

@@ -28,4 +28,10 @@ public class OrganizationResponse {
     private UUID walletId;
     private BigDecimal walletBalance;
     private String walletCurrency;
+    private Boolean notificationsEnabled;
+    private BigDecimal lowBalanceThreshold;
+    /** Platform kill-switch from server config; org SMS is skipped when false. */
+    private Boolean platformNotificationsEnabled;
+    /** Default threshold for new organizations, from server config. */
+    private BigDecimal platformLowBalanceThreshold;
 }

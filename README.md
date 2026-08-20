@@ -18,6 +18,7 @@ Integrating applications send SMS through the Nova SMS REST API. They never talk
 - Delivery tracking with Nova SMS statuses (not raw provider payloads)
 - Super Admin platform management
 - Developer API: hashed `nova_live_…` keys, permissions, rate limits, idempotency
+- External apps can show wallet balance and accept M-Pesa top-ups on their own site (`WALLET_READ` / `WALLET_TOPUP`)
 
 ## SaaS vs API gateway
 
@@ -406,8 +407,8 @@ In the running app: Super Admin → Developer, public page `/developers`, and Sw
 - `POST /api/v1/auth/reset-password` — reset a password with the one-time token
 - `GET /api/v1/wallet/balance` — get wallet balance and SMS cost
 - `POST /api/v1/wallet/topup` — initiate M-Pesa STK Push
-- `GET /api/v1/wallet/topup/{transactionId}` — read top-up status
-- `POST /api/v1/wallet/topup/{transactionId}/check` — query and reconcile pending top-up status
+- `GET /api/v1/wallet/topup/{transactionId}` — recover/read stored top-up (does not query Safaricom)
+- `POST /api/v1/wallet/topup/{transactionId}/check` — poll pending top-up; queries Safaricom while `PENDING`
 - `GET /api/v1/wallet/transactions` — list wallet activity
 - `POST /api/v1/sms/send` — send one SMS
 - `POST /api/v1/sms/bulk` — send to numbers and/or a contact group
@@ -474,7 +475,7 @@ cd "Novastack Sms back\Novastack-Sms"
 - Never put a Nova SMS API key in frontend JavaScript.
 - Never commit API keys, JWTs, TalkSasa tokens, or M-Pesa secrets to Git.
 - Never expose the API key to browser users.
-- Scoped live keys can only call `/api/v1/sms/**`.
+- Scoped live keys can only call `/api/v1/sms/**` and, when granted, `/api/v1/wallet/**`.
 - Serve the API over HTTPS in production.
 
 ## Production checklist
@@ -497,6 +498,7 @@ cd "Novastack Sms back\Novastack-Sms"
 3. Copy the `nova_live_…` key once and store it as `NOVA_SMS_API_KEY`.
 4. From **your backend**, `POST /api/v1/sms/send` with `X-API-Key`.
 5. Read `data.id` / `data.status`. Optionally `GET /api/v1/sms/{id}/status`.
+6. To show balance and M-Pesa top-up on **your** site, grant `WALLET_READ` and `WALLET_TOPUP`, then call `/api/v1/wallet/balance` and `/api/v1/wallet/topup` from your backend.
 
 Correct architecture:
 

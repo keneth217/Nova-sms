@@ -12,6 +12,10 @@ export type MessageStatus =
   | 'REJECTED'
   | 'CANCELLED'
 
+export function isBillableFailure(status?: MessageStatus | string | null): boolean {
+  return status === 'FAILED' || status === 'REJECTED' || status === 'CANCELLED'
+}
+
 export interface SendSmsRequest {
   recipient: string
   message: string
@@ -65,6 +69,10 @@ export interface BulkSmsResponse {
   recipientCount?: number
   smsUnits?: number
   status?: string
+  sourceBatchId?: string | null
+  resentCount?: number | null
+  skippedCount?: number | null
+  failedCount?: number | null
   messages: SmsMessage[]
 }
 

@@ -15,6 +15,7 @@ import com.novastack.sms.domain.repository.UserRepository;
 import com.novastack.sms.dto.request.ChangePasswordRequest;
 import com.novastack.sms.dto.request.LoginRequest;
 import com.novastack.sms.dto.request.OrganizationRegisterRequest;
+import com.novastack.sms.dto.request.OrganizationSettingsRequest;
 import com.novastack.sms.dto.response.AuthResponse;
 import com.novastack.sms.dto.response.OrganizationResponse;
 import com.novastack.sms.dto.response.UserResponse;
@@ -49,6 +50,8 @@ public class AuthService {
     private final AppProperties appProperties;
     private final OrganizationAccessService organizationAccessService;
     private final WalletService walletService;
+    private final OrgNotificationService orgNotificationService;
+    private final SmsSettingsService smsSettingsService;
 
     @Transactional
     public OrganizationResponse register(OrganizationRegisterRequest request) {
@@ -82,10 +85,11 @@ public class AuthService {
                 .accountType(accountType)
                 .expiresAt(expiresAt)
                 .smsCost(appProperties.getSms().getDefaultCost())
+                .notificationsEnabled(true)
+                .lowBalanceThreshold(smsSettingsService.lowBalanceThreshold())
                 .build();
         organization = organizationRepository.save(organization);
-        organization.setMpesaAccountRef(buildMpesaAccountRef(organization.getId()));
-        organization = organizationRepository.save(organization);
+        organization = walletService.ensureMpesaAccountRef(organization);
 
         // Prepaid wallet for M-Pesa top-ups and SMS sending
         var wallet = walletService.createForOrganization(organization);
@@ -103,6 +107,8 @@ public class AuthService {
                 .privacyAcceptedAt(acceptedAt)
                 .build();
         userRepository.save(admin);
+
+        orgNotificationService.notifyWelcome(organization);
 
         return toOrgResponse(organization, activeDays, wallet);
     }
@@ -133,6 +139,7 @@ public class AuthService {
                 .tokenType("Bearer")
                 .userId(user.getId())
                 .email(user.getEmail())
+                .phone(resolveUserPhone(user))
                 .fullName(user.getFullName())
                 .role(user.getRole())
                 .organizationId(organization != null ? organization.getId() : null)
@@ -142,11 +149,32 @@ public class AuthService {
                 .build();
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public OrganizationResponse getCurrentOrganization() {
         UUID organizationId = SecurityUtils.requireOrganizationId();
         Organization organization = organizationRepository.findById(organizationId)
                 .orElseThrow(() -> new ApiException("Organization not found", HttpStatus.NOT_FOUND));
+        organization = walletService.ensureMpesaAccountRef(organization);
+        Wallet wallet = walletService.ensureWallet(organizationId);
+        Integer activeDays = null;
+        if (organization.getAccountType() == OrganizationAccountType.EVENT
+                && organization.getExpiresAt() != null) {
+            long days = ChronoUnit.DAYS.between(Instant.now(), organization.getExpiresAt());
+            activeDays = (int) Math.max(0, days);
+        }
+        return toOrgResponse(organization, activeDays, wallet);
+    }
+
+    @Transactional
+    public OrganizationResponse updateSettings(OrganizationSettingsRequest request) {
+        UUID organizationId = SecurityUtils.requireOrganizationId();
+        Organization organization = organizationRepository.findById(organizationId)
+                .orElseThrow(() -> new ApiException("Organization not found", HttpStatus.NOT_FOUND));
+        applyOrganizationProfile(organization, request);
+        organization.setNotificationsEnabled(Boolean.TRUE.equals(request.getNotificationsEnabled()));
+        organization.setLowBalanceThreshold(
+                request.getLowBalanceThreshold().setScale(2, java.math.RoundingMode.HALF_UP));
+        organization = organizationRepository.save(organization);
         Wallet wallet = walletService.ensureWallet(organizationId);
         Integer activeDays = null;
         if (organization.getAccountType() == OrganizationAccountType.EVENT
@@ -215,38 +243,32 @@ public class AuthService {
 
     @Transactional
     public void backfillMpesaAccountRefs() {
-        organizationRepository.findAll().stream()
-                .filter(org -> org.getMpesaAccountRef() == null || org.getMpesaAccountRef().isBlank())
-                .forEach(org -> {
-                    org.setMpesaAccountRef(buildMpesaAccountRef(org.getId()));
-                    organizationRepository.save(org);
-                });
+        organizationRepository.findAll().forEach(walletService::ensureMpesaAccountRef);
     }
 
     @Transactional
     public void ensureSuperAdmin() {
         var cfg = appProperties.getSuperAdmin();
-        if (userRepository.existsByEmail(cfg.getEmail())) {
-            return;
-        }
-        userRepository.save(User.builder()
+        String rawPhone = blankToNull(cfg.getPhone());
+        final String phone = rawPhone == null ? null : PhoneNormalizer.normalizeKenyanMobile(rawPhone);
+        userRepository.findByEmailIgnoreCase(cfg.getEmail()).ifPresentOrElse(user -> {
+            if (phone != null && !phone.equals(user.getPhone())) {
+                user.setPhone(phone);
+                userRepository.save(user);
+            }
+        }, () -> userRepository.save(User.builder()
                 .email(cfg.getEmail())
                 .password(passwordEncoder.encode(cfg.getPassword()))
                 .fullName(cfg.getFullName())
+                .phone(phone)
                 .role(UserRole.SUPER_ADMIN)
                 .organization(null)
                 .enabled(true)
-                .build());
+                .build()));
     }
 
     private String generateApiKey() {
         return "nsk_" + UUID.randomUUID().toString().replace("-", "") + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
-    }
-
-    private String buildMpesaAccountRef(UUID organizationId) {
-        String prefix = appProperties.getMpesa().getAccountReferencePrefix();
-        String compact = organizationId.toString().replace("-", "");
-        return (prefix + compact.substring(0, Math.min(8, compact.length()))).toUpperCase();
     }
 
     private OrganizationResponse toOrgResponse(
@@ -268,6 +290,12 @@ public class AuthService {
                 .walletId(wallet != null ? wallet.getId() : null)
                 .walletBalance(wallet != null ? wallet.getBalance() : null)
                 .walletCurrency(wallet != null ? wallet.getCurrency() : "KES")
+                .notificationsEnabled(organization.isNotificationsEnabled())
+                .lowBalanceThreshold(organization.getLowBalanceThreshold() != null
+                        ? organization.getLowBalanceThreshold()
+                        : smsSettingsService.lowBalanceThreshold())
+                .platformNotificationsEnabled(smsSettingsService.isEnabled())
+                .platformLowBalanceThreshold(smsSettingsService.lowBalanceThreshold())
                 .build();
     }
 
@@ -276,6 +304,7 @@ public class AuthService {
         return UserResponse.builder()
                 .id(user.getId())
                 .email(user.getEmail())
+                .phone(resolveUserPhone(user))
                 .fullName(user.getFullName())
                 .role(user.getRole())
                 .enabled(user.isEnabled())
@@ -283,5 +312,73 @@ public class AuthService {
                 .organizationName(organization != null ? organization.getName() : null)
                 .createdAt(user.getCreatedAt())
                 .build();
+    }
+
+    private void applyOrganizationProfile(Organization organization, OrganizationSettingsRequest request) {
+        if (request.getName() != null) {
+            String name = request.getName().trim();
+            if (name.isBlank()) {
+                throw new ApiException("Organization name is required", HttpStatus.BAD_REQUEST);
+            }
+            organization.setName(name);
+        }
+        if (request.getEmail() != null) {
+            String email = request.getEmail().trim();
+            if (email.isBlank()) {
+                throw new ApiException("Organization email is required", HttpStatus.BAD_REQUEST);
+            }
+            applyOrganizationEmail(organization, email);
+        }
+        if (request.getPhone() != null) {
+            String phone = PhoneNormalizer.normalizeKenyanMobile(request.getPhone());
+            if (!phone.equals(organization.getPhone())
+                    && organizationRepository.existsByPhoneAndIdNot(phone, organization.getId())) {
+                throw new ApiException("Phone number already registered", HttpStatus.CONFLICT);
+            }
+            organization.setPhone(phone);
+        }
+    }
+
+    private void applyOrganizationEmail(Organization organization, String email) {
+        String current = organization.getEmail();
+        if (current != null && current.equalsIgnoreCase(email)) {
+            organization.setEmail(email);
+            return;
+        }
+        if (organizationRepository.existsByEmailIgnoreCaseAndIdNot(email, organization.getId())) {
+            throw new ApiException("Email already registered", HttpStatus.CONFLICT);
+        }
+        userRepository.findByEmailIgnoreCase(email).ifPresent(existing -> {
+            UUID existingOrgId = existing.getOrganization() != null ? existing.getOrganization().getId() : null;
+            if (!organization.getId().equals(existingOrgId)) {
+                throw new ApiException("Email already registered", HttpStatus.CONFLICT);
+            }
+        });
+        String previous = current;
+        organization.setEmail(email);
+        if (previous == null || previous.isBlank()) {
+            return;
+        }
+        for (User member : userRepository.findByOrganizationId(organization.getId())) {
+            if (member.getEmail() != null && member.getEmail().equalsIgnoreCase(previous)) {
+                member.setEmail(email);
+                userRepository.save(member);
+            }
+        }
+    }
+
+    private static String resolveUserPhone(User user) {
+        if (user.getPhone() != null && !user.getPhone().isBlank()) {
+            return user.getPhone().trim();
+        }
+        Organization organization = user.getOrganization();
+        return organization != null ? organization.getPhone() : null;
+    }
+
+    private static String blankToNull(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim();
     }
 }

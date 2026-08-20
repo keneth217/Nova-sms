@@ -7,26 +7,36 @@ import com.novastack.sms.domain.enums.TopupStatus;
 import com.novastack.sms.domain.enums.UserRole;
 import com.novastack.sms.dto.request.AdminCreateOrganizationRequest;
 import com.novastack.sms.dto.request.AdminCreditWalletRequest;
+import com.novastack.sms.dto.request.CreditMpesaReceiptRequest;
+import com.novastack.sms.dto.request.VerifyMpesaReceiptRequest;
 import com.novastack.sms.dto.request.CreateApiClientRequest;
 import com.novastack.sms.dto.request.SendSmsRequest;
 import com.novastack.sms.dto.request.UpdateApiClientRequest;
 import com.novastack.sms.dto.request.UpdatePlatformBillingRequest;
+import com.novastack.sms.dto.request.UpdatePlatformSmsSettingsRequest;
 import com.novastack.sms.dto.response.AdminOrganizationResponse;
 import com.novastack.sms.dto.response.ApiClientCreatedResponse;
 import com.novastack.sms.dto.response.ApiClientResponse;
 import com.novastack.sms.dto.response.ApiClientUsageResponse;
 import com.novastack.sms.dto.response.ApiResponse;
 import com.novastack.sms.dto.response.DeveloperConfigResponse;
+import com.novastack.sms.dto.response.MpesaReceiptLookupResponse;
+import com.novastack.sms.dto.response.PaybillCollectionDashboardResponse;
 import com.novastack.sms.dto.response.PlatformBillingResponse;
+import com.novastack.sms.dto.response.PlatformNotificationSettingsResponse;
+import com.novastack.sms.dto.response.PlatformOverviewResponse;
 import com.novastack.sms.dto.response.SmsMessageResponse;
+import com.novastack.sms.dto.response.StkPushResponse;
 import com.novastack.sms.dto.response.TalkSasaAccountResponse;
 import com.novastack.sms.dto.response.UserResponse;
 import com.novastack.sms.dto.response.WalletTransactionResponse;
 import com.novastack.sms.service.AdminService;
 import com.novastack.sms.service.ApiClientService;
 import com.novastack.sms.service.DeveloperPortalService;
+import com.novastack.sms.service.PaybillCollectionService;
 import com.novastack.sms.service.SenderIdService;
 import com.novastack.sms.service.SmsService;
+import com.novastack.sms.service.WalletService;
 import com.novastack.sms.provider.TalkSasaProfileClient;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -65,6 +75,8 @@ public class AdminController {
     private final SenderIdService senderIdService;
     private final TalkSasaProfileClient talkSasaProfileClient;
     private final DeveloperPortalService developerPortalService;
+    private final WalletService walletService;
+    private final PaybillCollectionService paybillCollectionService;
 
     @GetMapping("/organizations")
     @Operation(summary = "List all registered organizations")
@@ -131,7 +143,7 @@ public class AdminController {
 
     @GetMapping("/overview")
     @Operation(summary = "Platform overview counts")
-    public ApiResponse<Map<String, Long>> overview() {
+    public ApiResponse<PlatformOverviewResponse> overview() {
         return ApiResponse.ok(adminService.platformOverview());
     }
 
@@ -154,12 +166,64 @@ public class AdminController {
         return ApiResponse.ok(adminService.updatePlatformBilling(request));
     }
 
+    @GetMapping("/notifications")
+    @Operation(summary = "Platform SMS notification settings and message templates")
+    public ApiResponse<PlatformNotificationSettingsResponse> notifications() {
+        return ApiResponse.ok(adminService.platformNotifications());
+    }
+
+    @PutMapping("/notifications")
+    @Operation(summary = "Update platform SMS notification templates and defaults")
+    public ApiResponse<PlatformNotificationSettingsResponse> updateNotifications(
+            @Valid @RequestBody UpdatePlatformSmsSettingsRequest request) {
+        return ApiResponse.ok(adminService.updatePlatformNotifications(request));
+    }
+
+    @GetMapping("/mpesa/c2b/urls")
+    @Operation(summary = "C2B confirmation and validation URLs Nova will register with Daraja")
+    public ApiResponse<Map<String, String>> c2bUrls() {
+        return ApiResponse.ok(walletService.c2bCallbackUrls());
+    }
+
+    @PostMapping("/mpesa/c2b/register")
+    @Operation(summary = "Register C2B v2 confirmation and validation URLs for the platform Paybill")
+    public ApiResponse<Map<String, String>> registerC2b() {
+        return ApiResponse.ok("C2B v2 URLs registered", walletService.registerC2bV2Urls());
+    }
+
+    @GetMapping("/collections")
+    @Operation(summary = "Paybill collection stats for non-wallet accounts (SHEILA, KENETH, …)")
+    public ApiResponse<PaybillCollectionDashboardResponse> collections(
+            @RequestParam(required = false) String billRef,
+            @PageableDefault(size = 50) Pageable pageable) {
+        return ApiResponse.ok(paybillCollectionService.dashboard(billRef, pageable));
+    }
+
     @GetMapping("/topups")
     @Operation(summary = "List wallet top-ups across all organizations")
     public ApiResponse<Page<WalletTransactionResponse>> listTopups(
             @RequestParam(required = false) TopupStatus status,
             @PageableDefault(size = 50) Pageable pageable) {
         return ApiResponse.ok(adminService.listTopups(status, pageable));
+    }
+
+    @PostMapping("/topups/verify-receipt")
+    @Operation(summary = "Verify a receipt; if Nova stored the C2B BillRefNumber, credit that org wallet automatically")
+    public ApiResponse<MpesaReceiptLookupResponse> verifyReceipt(@Valid @RequestBody VerifyMpesaReceiptRequest request) {
+        return ApiResponse.ok(walletService.verifyReceiptPlatform(request.getMpesaReceipt()));
+    }
+
+    @PostMapping("/topups/credit-receipt")
+    @Operation(summary = "Manual recovery when C2B metadata is missing: resolve org from Paybill account, never from organizationId")
+    public ApiResponse<MpesaReceiptLookupResponse> creditReceipt(@Valid @RequestBody CreditMpesaReceiptRequest request) {
+        return ApiResponse.ok(walletService.creditByMpesaReceipt(
+                request.getAccountNumber(), request.getMpesaReceipt(), request.getAmount()));
+    }
+
+    @PostMapping("/topups/{transactionId}/check")
+    @Operation(summary = "Re-query Safaricom for a top-up and credit the wallet if the payment succeeded")
+    public ApiResponse<StkPushResponse> checkTopup(@PathVariable UUID transactionId) {
+        return ApiResponse.ok(walletService.checkTopUpTransaction(transactionId));
     }
 
     @GetMapping("/sms")

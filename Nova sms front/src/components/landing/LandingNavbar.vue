@@ -20,20 +20,6 @@ onMounted(() => {
   window.addEventListener('scroll', onScroll, { passive: true })
 })
 onUnmounted(() => window.removeEventListener('scroll', onScroll))
-
-function goFeatures() {
-  open.value = false
-  if (route.path === '/') {
-    document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })
-  }
-}
-
-function goEvents() {
-  open.value = false
-  if (route.path === '/') {
-    document.getElementById('events')?.scrollIntoView({ behavior: 'smooth' })
-  }
-}
 </script>
 
 <template>
@@ -55,7 +41,7 @@ function goEvents() {
         <span class="font-serif text-lg font-bold tracking-tight text-slate-900">Nova SMS</span>
       </RouterLink>
 
-      <nav class="hidden items-center gap-8 md:flex">
+      <nav class="hidden items-center gap-6 lg:flex">
         <RouterLink
           to="/"
           class="text-sm font-medium text-slate-600 transition hover:text-slate-900"
@@ -64,25 +50,32 @@ function goEvents() {
           Home
         </RouterLink>
         <RouterLink
-          to="/#events"
+          to="/sms-gateway"
           class="text-sm font-medium text-slate-600 transition hover:text-slate-900"
-          @click="goEvents"
+          active-class="!text-slate-900"
         >
-          Events
+          SMS gateway
         </RouterLink>
         <RouterLink
-          to="/#features"
+          to="/sms-api"
           class="text-sm font-medium text-slate-600 transition hover:text-slate-900"
-          @click="goFeatures"
+          active-class="!text-slate-900"
         >
-          Features
+          API
         </RouterLink>
         <RouterLink
           to="/developers"
           class="text-sm font-medium text-slate-600 transition hover:text-slate-900"
           active-class="!text-slate-900"
         >
-          Developers
+          Documentation
+        </RouterLink>
+        <RouterLink
+          to="/pricing"
+          class="text-sm font-medium text-slate-600 transition hover:text-slate-900"
+          active-class="!text-slate-900"
+        >
+          Pricing
         </RouterLink>
         <RouterLink
           to="/data-bundles"
@@ -93,7 +86,7 @@ function goEvents() {
         </RouterLink>
       </nav>
 
-      <div class="hidden items-center gap-3 md:flex">
+      <div class="hidden items-center gap-3 lg:flex">
         <template v-if="auth.isAuthenticated">
           <RouterLink
             :to="auth.isSuperAdmin ? '/admin/system-reports' : '/dashboard'"
@@ -130,7 +123,7 @@ function goEvents() {
 
       <button
         type="button"
-        class="rounded-lg p-2 text-slate-600 hover:bg-slate-100 md:hidden"
+        class="rounded-lg p-2 text-slate-600 hover:bg-slate-100 lg:hidden"
         aria-label="Toggle menu"
         @click="open = !open"
       >
@@ -141,38 +134,25 @@ function goEvents() {
 
     <div
       v-if="open"
-      class="border-t border-slate-200 bg-white px-4 py-4 md:hidden"
+      class="border-t border-slate-200 bg-white px-4 py-4 lg:hidden"
     >
       <div class="flex flex-col gap-3">
         <RouterLink to="/" class="text-sm font-medium text-slate-900" @click="open = false">
           Home
         </RouterLink>
-        <RouterLink
-          to="/#events"
-          class="text-sm font-medium text-slate-600"
-          @click="goEvents"
-        >
-          Events
+        <RouterLink to="/sms-gateway" class="text-sm font-medium text-slate-600" @click="open = false">
+          SMS gateway
         </RouterLink>
-        <RouterLink
-          to="/#features"
-          class="text-sm font-medium text-slate-600"
-          @click="goFeatures"
-        >
-          Features
+        <RouterLink to="/sms-api" class="text-sm font-medium text-slate-600" @click="open = false">
+          API
         </RouterLink>
-        <RouterLink
-          to="/developers"
-          class="text-sm font-medium text-slate-600"
-          @click="open = false"
-        >
-          Developers
+        <RouterLink to="/developers" class="text-sm font-medium text-slate-600" @click="open = false">
+          Documentation
         </RouterLink>
-        <RouterLink
-          to="/data-bundles"
-          class="text-sm font-medium text-slate-600"
-          @click="open = false"
-        >
+        <RouterLink to="/pricing" class="text-sm font-medium text-slate-600" @click="open = false">
+          Pricing
+        </RouterLink>
+        <RouterLink to="/data-bundles" class="text-sm font-medium text-slate-600" @click="open = false">
           Data bundles
         </RouterLink>
         <hr class="border-slate-200" />

@@ -1,5 +1,6 @@
 export type WalletTransactionType = 'TOPUP' | 'SMS_DEBIT' | 'REFUND' | 'ADJUSTMENT'
 export type TopupStatus = 'PENDING' | 'COMPLETED' | 'FAILED'
+export type PaymentMethod = 'STK_PUSH' | 'PAYBILL'
 
 export interface WalletBalance {
   walletId: string
@@ -8,6 +9,9 @@ export interface WalletBalance {
   currency: string
   smsCost: number
   availableSms?: number
+  paybill?: string
+  accountNumber?: string
+  businessName?: string
 }
 
 export interface WalletTopupRequest {
@@ -46,6 +50,12 @@ export interface WalletTransaction {
   status: TopupStatus | null
   resultCode: string | null
   resultDesc: string | null
+  callbackReceived?: boolean
+  walletCredited?: boolean
+  paymentMethod?: PaymentMethod | null
+  paybill?: string | null
+  accountNumber?: string | null
+  organizationName?: string | null
   createdAt: string
 }
 
@@ -54,4 +64,22 @@ export interface PaymentInstructions {
   accountNumber: string
   businessName: string
   notes: string[]
+}
+
+export type MpesaReceiptSource = 'WALLET' | 'COLLECTION' | 'C2B_INBOUND' | 'NONE'
+
+export interface MpesaReceiptLookup {
+  mpesaReceipt: string
+  found: boolean
+  source: MpesaReceiptSource
+  walletCredited: boolean
+  needsManualRecovery?: boolean
+  recoverableFromCallback?: boolean
+  transactionId?: string | null
+  organizationId?: string | null
+  organizationName?: string | null
+  amount?: number | null
+  status?: TopupStatus | null
+  billRef?: string | null
+  message: string
 }

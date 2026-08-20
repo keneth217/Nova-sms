@@ -81,6 +81,27 @@ export const useOrganizationStore = defineStore('organization', () => {
     }
   }
 
+  async function updateSettings(payload: {
+    name?: string
+    email?: string
+    phone?: string
+    notificationsEnabled: boolean
+    lowBalanceThreshold: number
+  }) {
+    loading.value = true
+    error.value = null
+    try {
+      currentOrganization.value = await organizationService.updateSettings(payload)
+      setOrganizationName(currentOrganization.value.name)
+      return currentOrganization.value
+    } catch (e) {
+      error.value = e instanceof Error ? e.message : 'Failed to save settings'
+      throw e
+    } finally {
+      loading.value = false
+    }
+  }
+
   async function updateStatus(id: string, status: OrganizationStatus) {
     const updated = await organizationService.updateOrganizationStatus(id, status)
     const idx = organizations.value.findIndex((o) => o.id === id)
@@ -105,6 +126,7 @@ export const useOrganizationStore = defineStore('organization', () => {
     fetchOverview,
     fetchOrganizations,
     updateStatus,
+    updateSettings,
     setOrganizationName,
     clearCurrentOrganization,
   }

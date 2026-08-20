@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, onMounted, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useSmsStore } from '@/stores/sms.store'
-import type { MessageChannel } from '@/models/sms.model'
+import { useWalletStore } from '@/stores/wallet.store'
+import { isBillableFailure, type MessageChannel, type SmsMessage } from '@/models/sms.model'
 import PageHeader from '@/components/common/PageHeader.vue'
 import AppCard from '@/components/common/AppCard.vue'
 import AppInput from '@/components/common/AppInput.vue'
@@ -11,15 +12,30 @@ import FormField from '@/components/common/FormField.vue'
 import AppButton from '@/components/common/AppButton.vue'
 import DataTable from '@/components/tables/DataTable.vue'
 import EntityStatusBadge from '@/components/common/EntityStatusBadge.vue'
-import { formatCurrency, formatDate, formatProviderError } from '@/utils/format'
+import { formatCurrency, formatDate, formatProviderError, summarizeBulkSmsResult } from '@/utils/format'
 
 const route = useRoute()
 const sms = useSmsStore()
+const wallet = useWalletStore()
 const channel = computed<MessageChannel>(() =>
   route.meta.channel === 'WHATSAPP' ? 'WHATSAPP' : 'SMS',
 )
 const isWhatsApp = computed(() => channel.value === 'WHATSAPP')
 const channelLabel = computed(() => (isWhatsApp.value ? 'WhatsApp' : 'SMS'))
+const resendMessage = ref('')
+const resendError = ref('')
+const resendingKey = ref('')
+
+const firstFailedBatchRowIds = computed(() => {
+  const seen = new Set<string>()
+  const ids = new Set<string>()
+  for (const row of sms.history) {
+    if (!row.batchId || !isBillableFailure(row.status) || seen.has(row.batchId)) continue
+    seen.add(row.batchId)
+    ids.add(row.id)
+  }
+  return ids
+})
 
 onMounted(async () => {
   await Promise.all([sms.fetchHistory(0, 20, channel.value), sms.fetchSenderIds()])
@@ -32,6 +48,51 @@ watch(channel, () => {
 async function applyFilters() {
   await sms.fetchHistory(0, 20, channel.value)
 }
+
+function confirmResendFailed(row: SmsMessage): boolean {
+  const failedInView = sms.history.filter(
+    (item) => item.batchId === row.batchId && isBillableFailure(item.status),
+  ).length
+  return window.confirm(
+    `Resend only the failed recipients in this batch${failedInView ? ` (${failedInView} on this page)` : ''}? Already sent numbers will not be messaged again.`,
+  )
+}
+
+async function resendFailedBatch(row: SmsMessage) {
+  if (!row.batchId || !confirmResendFailed(row)) return
+  resendMessage.value = ''
+  resendError.value = ''
+  resendingKey.value = row.batchId
+  try {
+    const result = await sms.resendFailed(row.batchId, channel.value)
+    const summary = summarizeBulkSmsResult(result)
+    const skipped = result.skippedCount ?? 0
+    resendMessage.value = skipped
+      ? `${summary.text} ${skipped} already-sent recipient${skipped === 1 ? ' was' : 's were'} skipped.`
+      : summary.text
+    await Promise.all([sms.fetchHistory(0, 20, channel.value), wallet.fetchBalance()])
+  } catch (e) {
+    resendError.value = e instanceof Error ? e.message : 'Failed to resend'
+  } finally {
+    resendingKey.value = ''
+  }
+}
+
+async function resendSingle(row: SmsMessage) {
+  if (!window.confirm(`Resend to ${row.recipient} as a new ${channelLabel.value} request?`)) return
+  resendMessage.value = ''
+  resendError.value = ''
+  resendingKey.value = row.id
+  try {
+    const result = await sms.resendMessage(row.id, channel.value)
+    resendMessage.value = `New ${channelLabel.value} sent to ${result.recipient} (${result.status}).`
+    await Promise.all([sms.fetchHistory(0, 20, channel.value), wallet.fetchBalance()])
+  } catch (e) {
+    resendError.value = e instanceof Error ? e.message : 'Failed to resend'
+  } finally {
+    resendingKey.value = ''
+  }
+}
 </script>
 
 <template>
@@ -41,9 +102,12 @@ async function applyFilters() {
       :description="
         isWhatsApp
           ? 'Search and filter outbound WhatsApp messages across your organization.'
-          : 'Search and filter outbound messages across your organization.'
+          : 'Search and filter outbound messages across your organization. Resend Failed sends only failed recipients in that batch.'
       "
     />
+
+    <p v-if="resendError" class="mb-4 text-sm text-rose-600">{{ resendError }}</p>
+    <p v-else-if="resendMessage" class="mb-4 text-sm text-brand-700">{{ resendMessage }}</p>
 
     <AppCard class="mb-6" title="Filters">
       <div class="grid gap-4 md:grid-cols-4">
@@ -86,6 +150,7 @@ async function applyFilters() {
         { key: 'units', label: 'Units' },
         { key: 'status', label: 'Status' },
         { key: 'date', label: 'Date' },
+        { key: 'actions', label: 'Actions' },
       ]"
     >
       <tr v-for="row in sms.history" :key="row.id" class="hover:bg-slate-50/70">
@@ -94,7 +159,7 @@ async function applyFilters() {
         <td class="max-w-sm px-4 py-3 text-slate-600">
           <p class="truncate">{{ row.content }}</p>
           <p
-            v-if="(row.status === 'FAILED' || row.status === 'REJECTED' || row.status === 'CANCELLED') && row.failureReason"
+            v-if="isBillableFailure(row.status) && row.failureReason"
             class="mt-1 text-xs text-rose-600"
             :title="row.failureReason"
           >
@@ -112,6 +177,26 @@ async function applyFilters() {
           <template v-else>
             {{ formatDate(row.createdAt) }}
           </template>
+        </td>
+        <td class="whitespace-nowrap px-4 py-3">
+          <AppButton
+            v-if="row.batchId && firstFailedBatchRowIds.has(row.id)"
+            variant="secondary"
+            size="sm"
+            :loading="resendingKey === row.batchId"
+            @click="resendFailedBatch(row)"
+          >
+            Resend failed
+          </AppButton>
+          <AppButton
+            v-else-if="!row.batchId && isBillableFailure(row.status)"
+            variant="secondary"
+            size="sm"
+            :loading="resendingKey === row.id"
+            @click="resendSingle(row)"
+          >
+            Resend
+          </AppButton>
         </td>
       </tr>
     </DataTable>

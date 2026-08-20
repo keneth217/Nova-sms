@@ -114,6 +114,7 @@ export const useAuthStore = defineStore('auth', () => {
           role: profile.value.role,
           organizationId: profile.value.organizationId,
           organizationName: profile.value.organizationName,
+          phone: profile.value.phone ?? null,
         }
         localStorage.setItem(USER_KEY, JSON.stringify(user.value))
       }

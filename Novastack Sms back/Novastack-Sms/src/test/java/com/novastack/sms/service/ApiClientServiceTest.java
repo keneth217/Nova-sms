@@ -71,6 +71,31 @@ class ApiClientServiceTest {
     }
 
     @Test
+    void createPersistsWalletPermissionsWhenRequested() {
+        CreateApiClientRequest request = new CreateApiClientRequest();
+        request.setName("Chamaplus Backend");
+        request.setPermissions(java.util.EnumSet.of(
+                ApiPermission.SMS_SEND,
+                ApiPermission.WALLET_READ,
+                ApiPermission.WALLET_TOPUP));
+        when(organizationRepository.findById(orgId)).thenReturn(Optional.of(organization));
+        when(apiClientRepository.existsByOrganizationIdAndNameIgnoreCase(orgId, "Chamaplus Backend")).thenReturn(false);
+        when(apiClientRepository.existsByClientCode(any())).thenReturn(false);
+        when(apiClientRepository.save(any(ApiClient.class))).thenAnswer(invocation -> {
+            ApiClient client = invocation.getArgument(0);
+            client.setId(UUID.randomUUID());
+            return client;
+        });
+
+        service.create(orgId, request);
+
+        ArgumentCaptor<ApiClient> captor = ArgumentCaptor.forClass(ApiClient.class);
+        verify(apiClientRepository).save(captor.capture());
+        assertTrue(captor.getValue().getPermissions().contains(ApiPermission.WALLET_READ));
+        assertTrue(captor.getValue().getPermissions().contains(ApiPermission.WALLET_TOPUP));
+    }
+
+    @Test
     void revokeReplacesHashAndMarksRevoked() {
         UUID clientId = UUID.randomUUID();
         ApiClient client = ApiClient.builder()
