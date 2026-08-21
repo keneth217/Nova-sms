@@ -133,6 +133,8 @@ async function creditWallet() {
     <DataTable
       :columns="[
         { key: 'name', label: 'Organization' },
+        { key: 'email', label: 'Email' },
+        { key: 'phone', label: 'Phone' },
         { key: 'type', label: 'Type' },
         { key: 'billing', label: 'Billing' },
         { key: 'status', label: 'Status' },
@@ -145,7 +147,13 @@ async function creditWallet() {
       <tr v-for="row in org.organizations" :key="row.id" class="hover:bg-slate-50/70">
         <td class="px-4 py-3">
           <p class="font-medium text-slate-900">{{ row.name }}</p>
-          <p class="text-xs text-slate-500">{{ row.email }}</p>
+          <p v-if="row.mpesaAccountRef" class="font-mono text-[11px] text-slate-400">
+            {{ row.mpesaAccountRef }}
+          </p>
+        </td>
+        <td class="px-4 py-3 text-sm text-slate-700">{{ row.email || '—' }}</td>
+        <td class="whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-700">
+          {{ row.phone || '—' }}
         </td>
         <td class="px-4 py-3">
           <EntityStatusBadge :status="row.accountType || 'BUSINESS'" />

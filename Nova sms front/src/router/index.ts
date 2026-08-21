@@ -18,6 +18,7 @@ declare module 'vue-router' {
     ogType?: string
     canonicalPath?: string
     layout?: 'dashboard' | 'marketing'
+    hideMarketingChrome?: boolean
     channel?: 'SMS' | 'WHATSAPP'
     docId?: string
   }
@@ -166,6 +167,7 @@ const routes: RouteRecordRaw[] = [
           guestOnly: true,
           title: 'Sign in',
           robots: 'noindex,nofollow',
+          hideMarketingChrome: true,
           description: 'Sign in to your Nova SMS organization dashboard.',
         },
       },
@@ -173,19 +175,34 @@ const routes: RouteRecordRaw[] = [
         path: 'register',
         name: 'register',
         component: () => import('@/views/auth/RegisterView.vue'),
-        meta: { guestOnly: true, title: 'Create account', robots: 'noindex,nofollow' },
+        meta: {
+          guestOnly: true,
+          title: 'Create account',
+          robots: 'noindex,nofollow',
+          hideMarketingChrome: true,
+        },
       },
       {
         path: 'forgot-password',
         name: 'forgot-password',
         component: () => import('@/views/auth/ForgotPasswordView.vue'),
-        meta: { guestOnly: true, title: 'Forgot password', robots: 'noindex,nofollow' },
+        meta: {
+          guestOnly: true,
+          title: 'Forgot password',
+          robots: 'noindex,nofollow',
+          hideMarketingChrome: true,
+        },
       },
       {
         path: 'reset-password',
         name: 'reset-password',
         component: () => import('@/views/auth/ResetPasswordView.vue'),
-        meta: { guestOnly: true, title: 'Reset password', robots: 'noindex,nofollow' },
+        meta: {
+          guestOnly: true,
+          title: 'Reset password',
+          robots: 'noindex,nofollow',
+          hideMarketingChrome: true,
+        },
       },
       {
         path: 'terms',
