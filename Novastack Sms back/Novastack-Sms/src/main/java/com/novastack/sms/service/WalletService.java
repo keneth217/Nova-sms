@@ -1,19 +1,25 @@
 package com.novastack.sms.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.novastack.sms.config.AppProperties;
 import com.novastack.sms.domain.entity.MpesaC2bInbound;
+import com.novastack.sms.domain.entity.MpesaTransactionStatusQuery;
 import com.novastack.sms.domain.entity.Organization;
 import com.novastack.sms.domain.entity.PaybillCollection;
 import com.novastack.sms.domain.entity.Wallet;
 import com.novastack.sms.domain.entity.WalletTransaction;
 import com.novastack.sms.domain.enums.PaymentMethod;
 import com.novastack.sms.domain.enums.TopupStatus;
+import com.novastack.sms.domain.enums.TransactionStatusQueryState;
 import com.novastack.sms.domain.enums.WalletTransactionType;
+import com.novastack.sms.domain.repository.MpesaTransactionStatusQueryRepository;
 import com.novastack.sms.domain.repository.OrganizationRepository;
 import com.novastack.sms.domain.repository.WalletRepository;
 import com.novastack.sms.domain.repository.WalletTransactionRepository;
 import com.novastack.sms.dto.request.WalletTopupRequest;
+import com.novastack.sms.dto.response.MpesaC2bInstructionsResponse;
 import com.novastack.sms.dto.response.MpesaReceiptLookupResponse;
 import com.novastack.sms.dto.response.StkPushResponse;
 import com.novastack.sms.dto.response.WalletBalanceResponse;
@@ -21,6 +27,8 @@ import com.novastack.sms.dto.response.WalletTransactionResponse;
 import com.novastack.sms.exception.ApiException;
 import com.novastack.sms.mpesa.C2bCallbackResponses;
 import com.novastack.sms.mpesa.MpesaDarajaClient;
+import com.novastack.sms.mpesa.MpesaTransactionStatusParser;
+import com.novastack.sms.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.Hibernate;
@@ -51,6 +59,7 @@ public class WalletService {
 
     /** Matches wallet_transactions.phone_number (plain 254… or 64-char C2B hash). */
     private static final int PHONE_COLUMN_LENGTH = 64;
+    private static final int PENDING_STATUS_QUERY_MINUTES = 15;
 
     private final WalletRepository walletRepository;
     private final WalletTransactionRepository walletTransactionRepository;
@@ -62,6 +71,7 @@ public class WalletService {
     private final OrgNotificationService orgNotificationService;
     private final PaybillCollectionService paybillCollectionService;
     private final C2bInboundService c2bInboundService;
+    private final MpesaTransactionStatusQueryRepository transactionStatusQueryRepository;
 
     /**
      * Creates a zero-balance prepaid wallet for a new organization (register / ensure).
@@ -116,6 +126,41 @@ public class WalletService {
                 .build();
     }
 
+    @Transactional
+    public MpesaC2bInstructionsResponse c2bInstructions(UUID organizationId) {
+        WalletBalanceResponse balance = getBalance(organizationId);
+        String paybill = balance.getPaybill();
+        String account = balance.getAccountNumber();
+        return MpesaC2bInstructionsResponse.builder()
+                .paybill(paybill)
+                .accountNumber(account)
+                .businessName(balance.getBusinessName())
+                .currency(balance.getCurrency())
+                .instructions("Ask the customer to pay Paybill " + paybill
+                        + " using account " + account
+                        + ". Safaricom sends the C2B confirmation to Nova SMS, not to your server. "
+                        + "Then GET /api/v1/mpesa/c2b/transactions or POST /api/v1/mpesa/c2b/verify with the receipt.")
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public Page<WalletTransactionResponse> listC2bTransactions(UUID organizationId, Pageable pageable) {
+        getOrganization(organizationId);
+        return walletTransactionRepository
+                .findC2bTopupsByOrganization(organizationId, pageable)
+                .map(tx -> toTransactionResponse(tx, organizationId));
+    }
+
+    @Transactional(readOnly = true)
+    public WalletTransactionResponse getC2bTransaction(UUID organizationId, UUID transactionId) {
+        WalletTransaction tx = walletTransactionRepository.findByIdAndOrganizationId(transactionId, organizationId)
+                .orElseThrow(() -> new ApiException("C2B transaction not found", HttpStatus.NOT_FOUND));
+        if (resolvePaymentMethod(tx) != PaymentMethod.PAYBILL) {
+            throw new ApiException("C2B transaction not found", HttpStatus.NOT_FOUND);
+        }
+        return toTransactionResponse(tx, organizationId);
+    }
+
     /**
      * Initiates M-Pesa Daraja STK Push to the configured Paybill.
      * Wallet is credited only after a successful callback.
@@ -143,6 +188,7 @@ public class WalletService {
                 .topupStatus(TopupStatus.PENDING)
                 .paymentMethod(PaymentMethod.STK_PUSH)
                 .billRef(accountReference)
+                .apiClientId(SecurityUtils.optionalApiClientId().orElse(null))
                 .description("M-Pesa STK Push to Paybill " + appProperties.getMpesa().getShortcode()
                         + " (account " + accountReference + ")")
                 .build());
@@ -740,7 +786,148 @@ public class WalletService {
             return creditResolvedPaybill(stored.getBillRef(), receipt, stored.getAmount(), stored);
         }
 
+        MpesaReceiptLookupResponse querying = requestTransactionStatus(receipt);
+        if (querying != null) {
+            return querying;
+        }
         return notFoundReceipt(receipt, platform);
+    }
+
+    /**
+     * Secondary C2B reconciliation: ask Daraja Transaction Status when Nova has no callback yet.
+     * Clients never call this Daraja API. Credit still uses BillRefNumber from Safaricom, not the caller org.
+     */
+    MpesaReceiptLookupResponse requestTransactionStatus(String receipt) {
+        if (!mpesaDarajaClient.isTransactionStatusConfigured()) {
+            return null;
+        }
+        Instant since = Instant.now().minus(PENDING_STATUS_QUERY_MINUTES, ChronoUnit.MINUTES);
+        Optional<MpesaTransactionStatusQuery> pending = transactionStatusQueryRepository
+                .findFirstByMpesaReceiptIgnoreCaseAndStatusAndCreatedAtAfterOrderByCreatedAtDesc(
+                        receipt, TransactionStatusQueryState.PENDING, since);
+        if (pending.isPresent()) {
+            return queryingReceipt(receipt);
+        }
+        try {
+            Map<String, String> urls = transactionStatusCallbackUrls();
+            MpesaDarajaClient.TransactionStatusSubmitResult submitted = mpesaDarajaClient.queryTransactionStatus(
+                    receipt, urls.get("resultUrl"), urls.get("timeoutUrl"));
+            transactionStatusQueryRepository.save(MpesaTransactionStatusQuery.builder()
+                    .mpesaReceipt(receipt)
+                    .originatorConversationId(submitted.originatorConversationId())
+                    .conversationId(submitted.conversationId())
+                    .status(TransactionStatusQueryState.PENDING)
+                    .resultCode(submitted.responseCode())
+                    .resultDesc(submitted.responseDescription())
+                    .build());
+            return queryingReceipt(receipt);
+        } catch (Exception ex) {
+            log.warn("Daraja Transaction Status query skipped for receipt={}: {}", receipt, ex.getMessage());
+            return null;
+        }
+    }
+
+    @Transactional
+    public Map<String, Object> handleTransactionStatusResult(JsonNode payload) {
+        try {
+            MpesaTransactionStatusParser.ParsedResult parsed = MpesaTransactionStatusParser.parse(
+                    payload, appProperties.getMpesa().getShortcode());
+            MpesaTransactionStatusQuery row = findStatusQuery(parsed.originatorConversationId(), parsed.receipt());
+            if (row == null) {
+                row = MpesaTransactionStatusQuery.builder()
+                        .mpesaReceipt(parsed.receipt() == null ? "UNKNOWN" : parsed.receipt())
+                        .originatorConversationId(parsed.originatorConversationId())
+                        .build();
+            }
+            row.setConversationId(parsed.conversationId());
+            row.setResultCode(parsed.resultCode());
+            row.setResultDesc(parsed.resultDesc());
+            row.setAmount(parsed.amount());
+            row.setBillRef(parsed.billRef());
+            row.setTransactionStatus(parsed.transactionStatus());
+            row.setRawResult(clip(parsed.rawPayload(), 4000));
+            row.setStatus(parsed.completed()
+                    ? TransactionStatusQueryState.COMPLETED
+                    : TransactionStatusQueryState.FAILED);
+            if (parsed.receipt() != null) {
+                row.setMpesaReceipt(parsed.receipt());
+            }
+            transactionStatusQueryRepository.save(row);
+
+            if (parsed.canCredit()) {
+                ObjectNode confirmation = JsonNodeFactory.instance.objectNode();
+                confirmation.put("TransID", parsed.receipt());
+                confirmation.put("TransAmount", parsed.amount().stripTrailingZeros().toPlainString());
+                confirmation.put("BillRefNumber", parsed.billRef());
+                if (parsed.phone() != null) {
+                    confirmation.put("MSISDN", parsed.phone());
+                }
+                if (parsed.transactionDate() != null) {
+                    confirmation.put("TransTime", parsed.transactionDate());
+                }
+                return handleC2bConfirmation(confirmation);
+            }
+            log.info("Transaction Status result did not credit receipt={} resultCode={} billRef={} amount={}",
+                    parsed.receipt(), parsed.resultCode(), parsed.billRef(), parsed.amount());
+        } catch (Exception ex) {
+            log.error("Transaction Status result processing failed; acknowledging Daraja", ex);
+        }
+        return C2bCallbackResponses.accepted();
+    }
+
+    @Transactional
+    public Map<String, Object> handleTransactionStatusTimeout(JsonNode payload) {
+        try {
+            JsonNode result = MpesaTransactionStatusParser.unwrap(payload);
+            String originator = result == null ? null : textOrNull(result.path("OriginatorConversationID"));
+            String receipt = result == null ? null : textOrNull(result.path("TransactionID"));
+            MpesaTransactionStatusQuery row = findStatusQuery(originator, receipt);
+            if (row != null) {
+                row.setStatus(TransactionStatusQueryState.TIMEOUT);
+                row.setResultDesc("Queue timeout");
+                row.setRawResult(clip(payload == null ? null : payload.toString(), 4000));
+                transactionStatusQueryRepository.save(row);
+            }
+        } catch (Exception ex) {
+            log.error("Transaction Status timeout processing failed; acknowledging Daraja", ex);
+        }
+        return C2bCallbackResponses.accepted();
+    }
+
+    private MpesaTransactionStatusQuery findStatusQuery(String originatorConversationId, String receipt) {
+        if (originatorConversationId != null && !originatorConversationId.isBlank()) {
+            Optional<MpesaTransactionStatusQuery> byOriginator =
+                    transactionStatusQueryRepository.findFirstByOriginatorConversationId(originatorConversationId.trim());
+            if (byOriginator.isPresent()) {
+                return byOriginator.get();
+            }
+        }
+        if (receipt != null && !receipt.isBlank()) {
+            return transactionStatusQueryRepository
+                    .findFirstByMpesaReceiptIgnoreCaseOrderByCreatedAtDesc(receipt.trim())
+                    .orElse(null);
+        }
+        return null;
+    }
+
+    private MpesaReceiptLookupResponse queryingReceipt(String receipt) {
+        return MpesaReceiptLookupResponse.builder()
+                .mpesaReceipt(receipt)
+                .found(false)
+                .source("SAFARICOM_QUERY")
+                .walletCredited(false)
+                .needsManualRecovery(false)
+                .recoverableFromCallback(false)
+                .message("Nova is checking receipt " + receipt
+                        + " with Safaricom. Wait a few seconds, then verify again or GET /api/v1/mpesa/c2b/transactions.")
+                .build();
+    }
+
+    private String clip(String value, int max) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.length() <= max ? value : value.substring(0, max);
     }
 
     private MpesaReceiptLookupResponse lookupCreditedReceipt(String receipt, UUID organizationId, boolean platform) {
@@ -1327,6 +1514,15 @@ public class WalletService {
         body.put("responseType", "Completed");
         body.put("confirmationUrl", base + "/api/v1/payments/c2b/confirmation");
         body.put("validationUrl", base + "/api/v1/payments/c2b/validation");
+        body.putAll(transactionStatusCallbackUrls());
+        return body;
+    }
+
+    public Map<String, String> transactionStatusCallbackUrls() {
+        String base = trimSlash(appProperties.getMpesa().getCallbackBaseUrl());
+        Map<String, String> body = new LinkedHashMap<>();
+        body.put("resultUrl", base + "/api/v1/payments/transaction-status/result");
+        body.put("timeoutUrl", base + "/api/v1/payments/transaction-status/timeout");
         return body;
     }
 

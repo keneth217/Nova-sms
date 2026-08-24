@@ -53,4 +53,36 @@ public class PaymentsCallbackController {
             return C2bCallbackResponses.accepted();
         }
     }
+
+    @PostMapping(value = "/transaction-status/result", consumes = {
+            MediaType.APPLICATION_JSON_VALUE,
+            MediaType.TEXT_PLAIN_VALUE,
+            MediaType.ALL_VALUE
+    })
+    @Operation(summary = "Daraja Transaction Status result — Nova-owned C2B fallback, not a client callback")
+    public Map<String, Object> transactionStatusResult(@RequestBody JsonNode payload) {
+        try {
+            log.info("Received Daraja Transaction Status result");
+            return walletService.handleTransactionStatusResult(payload);
+        } catch (Exception ex) {
+            log.error("Transaction Status result failed; acknowledging Daraja", ex);
+            return C2bCallbackResponses.accepted();
+        }
+    }
+
+    @PostMapping(value = "/transaction-status/timeout", consumes = {
+            MediaType.APPLICATION_JSON_VALUE,
+            MediaType.TEXT_PLAIN_VALUE,
+            MediaType.ALL_VALUE
+    })
+    @Operation(summary = "Daraja Transaction Status queue timeout")
+    public Map<String, Object> transactionStatusTimeout(@RequestBody(required = false) JsonNode payload) {
+        try {
+            log.info("Received Daraja Transaction Status timeout");
+            return walletService.handleTransactionStatusTimeout(payload);
+        } catch (Exception ex) {
+            log.error("Transaction Status timeout failed; acknowledging Daraja", ex);
+            return C2bCallbackResponses.accepted();
+        }
+    }
 }

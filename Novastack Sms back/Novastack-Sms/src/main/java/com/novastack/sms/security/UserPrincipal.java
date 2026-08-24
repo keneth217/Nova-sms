@@ -126,7 +126,23 @@ public class UserPrincipal implements UserDetails {
         if (!isScopedApiClient()) {
             return true;
         }
-        return apiPermissions.contains(permission);
+        if (apiPermissions.contains(permission)) {
+            return true;
+        }
+        if (permission == ApiPermission.MPESA_STK_PUSH && apiPermissions.contains(ApiPermission.WALLET_TOPUP)) {
+            return true;
+        }
+        if (permission == ApiPermission.MPESA_STATUS
+                && (apiPermissions.contains(ApiPermission.WALLET_TOPUP)
+                || apiPermissions.contains(ApiPermission.MPESA_STK_PUSH))) {
+            return true;
+        }
+        if (permission == ApiPermission.MPESA_C2B
+                && (apiPermissions.contains(ApiPermission.WALLET_READ)
+                || apiPermissions.contains(ApiPermission.WALLET_TOPUP))) {
+            return true;
+        }
+        return false;
     }
 
     @Override

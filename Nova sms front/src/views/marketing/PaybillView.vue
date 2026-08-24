@@ -32,6 +32,16 @@ import { PLATFORM_PAYBILL } from '@/seo/public-paths'
     </section>
 
     <section>
+      <h2 class="text-xl font-semibold text-slate-900">For API clients</h2>
+      <p class="mt-2">
+        Call <code class="font-mono text-sm">GET /api/v1/mpesa/c2b</code> for Paybill instructions and
+        <code class="font-mono text-sm">GET /api/v1/mpesa/c2b/transactions</code> to list credits.
+        Optional: <code class="font-mono text-sm">POST /api/v1/mpesa/c2b/verify</code> with a receipt.
+        You never implement Safaricom callbacks.
+      </p>
+    </section>
+
+    <section>
       <h2 class="text-xl font-semibold text-slate-900">Callback processing</h2>
       <p class="mt-2">
         Confirmation payloads are stored, then the wallet is credited. If wallet credit fails after
@@ -44,8 +54,9 @@ import { PLATFORM_PAYBILL } from '@/seo/public-paths'
       <h2 class="text-xl font-semibold text-slate-900">Transaction reconciliation</h2>
       <p class="mt-2">
         The M-Pesa receipt (TransID) is the reconciliation key. Organizations can verify a delayed
-        top-up from the wallet page using that receipt. Admins can look up the same receipt. The
-        stored BillRefNumber always wins over any account typed in a recovery form.
+        top-up from the wallet page using that receipt, or from
+        <code class="font-mono text-sm">POST /api/v1/mpesa/c2b/verify</code>. Admins can look up the
+        same receipt. The stored BillRefNumber always wins over any account typed in a recovery form.
       </p>
     </section>
 

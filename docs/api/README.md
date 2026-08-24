@@ -42,11 +42,18 @@ See [Authentication](../authentication.md).
 | `GET` | `/api/v1/sms/history` | `SMS_HISTORY` | Paged history for the API client's organization |
 | `GET` | `/api/v1/wallet/balance` | `WALLET_READ` | Organization wallet balance and available SMS |
 | `GET` | `/api/v1/wallet/transactions` | `WALLET_READ` | Wallet activity for the API client's organization |
-| `POST` | `/api/v1/wallet/topup` | `WALLET_TOPUP` | Start M-Pesa STK Push from the integrating app |
-| `GET` | `/api/v1/wallet/topup/{id}` | `WALLET_TOPUP` | Read stored top-up status |
-| `POST` | `/api/v1/wallet/topup/{id}/check` | `WALLET_TOPUP` | Poll and reconcile a pending top-up |
+| `POST` | `/api/v1/mpesa/stkpush` | `MPESA_STK_PUSH` | Start M-Pesa STK Push (preferred client path) |
+| `POST` | `/api/v1/mpesa/checkout` | `MPESA_STK_PUSH` | Lipa Na M-Pesa Online Checkout (same as STK Push) |
+| `GET` | `/api/v1/mpesa/transactions/{id}` | `MPESA_STATUS` | Read stored STK transaction |
+| `GET` | `/api/v1/mpesa/transactions/{id}/status` | `MPESA_STATUS` | Poll and reconcile a pending STK |
+| `GET` | `/api/v1/mpesa/c2b/transactions` | `MPESA_C2B` | List Paybill C2B credits |
+| `GET` | `/api/v1/mpesa/c2b/transactions/{id}` | `MPESA_C2B` | Get one C2B credit |
+| `POST` | `/api/v1/wallet/topup` | `WALLET_TOPUP` | Same STK initiate as `/mpesa/stkpush` |
+| `GET` | `/api/v1/wallet/topup/{id}` | `WALLET_TOPUP` | Read stored top-up status (no Safaricom call) |
+| `POST` | `/api/v1/wallet/topup/{id}/check` | `WALLET_TOPUP` | Poll and reconcile a pending STK top-up |
+| `POST` | `/api/v1/wallet/topup/verify-receipt` | `WALLET_TOPUP` | Look up a Paybill or STK top-up by M-Pesa receipt |
 
-Scoped `nova_live_…` keys may call `/api/v1/sms/**` and, when granted, `/api/v1/wallet/**`. Dashboard JWT users and legacy `nsk_…` organization keys are not permission-scoped.
+Scoped `nova_live_…` keys may call `/api/v1/sms/**`, `/api/v1/wallet/**` when granted, and `/api/v1/mpesa/**` client routes when granted. `WALLET_TOPUP` implies `MPESA_STK_PUSH`, `MPESA_STATUS`, and `MPESA_C2B`. `WALLET_READ` implies `MPESA_C2B`. Clients do not configure Safaricom callbacks — Nova handles them; apps poll status or list C2B transactions. Dashboard JWT users and legacy `nsk_…` organization keys are not permission-scoped.
 
 ## Guides
 
@@ -55,6 +62,7 @@ Scoped `nova_live_…` keys may call `/api/v1/sms/**` and, when granted, `/api/v
 - [SMS status](sms-status.md)
 - [SMS history](sms-history.md)
 - [Wallet](wallet.md)
+- [M-Pesa](mpesa.md) — STK / checkout, polling, C2B, Safaricom callbacks on Nova
 - [Errors](errors.md)
 - [Idempotency](idempotency.md)
 - [Rate limits](rate-limits.md)

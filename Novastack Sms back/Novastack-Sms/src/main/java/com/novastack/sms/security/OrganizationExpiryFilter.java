@@ -31,15 +31,18 @@ public class OrganizationExpiryFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getRequestURI();
-        return path.startsWith("/api/v1/auth")
-                || path.startsWith("/api/v1/organizations/register")
-                || path.startsWith("/api/v1/dlr")
-                || path.startsWith("/api/v1/mpesa")
-                || path.startsWith("/api/v1/data-bundles")
-                || path.startsWith("/api/v1/admin")
-                || path.startsWith("/actuator")
-                || path.startsWith("/v3/api-docs")
-                || path.startsWith("/swagger-ui");
+        return path.contains("/api/v1/auth")
+                || path.contains("/api/v1/organizations/register")
+                || path.contains("/api/v1/dlr")
+                || path.contains("/api/v1/mpesa/stk/callback")
+                || path.contains("/api/v1/mpesa/c2b/confirmation")
+                || path.contains("/api/v1/mpesa/c2b/validation")
+                || path.contains("/api/v1/payments")
+                || path.contains("/api/v1/data-bundles")
+                || path.contains("/api/v1/admin")
+                || path.contains("/actuator")
+                || path.contains("/v3/api-docs")
+                || path.contains("/swagger-ui");
     }
 
     @Override

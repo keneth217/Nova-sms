@@ -1,14 +1,13 @@
 <script setup lang="ts">
 import { RouterLink } from 'vue-router'
+import BrandLogo from '@/components/common/BrandLogo.vue'
 
 const year = new Date().getFullYear()
 
 const productLinks = [
-  { to: '/sms-gateway', label: 'Bulk SMS gateway' },
   { to: '/mpesa-stk-push', label: 'M-Pesa STK Push' },
   { to: '/mpesa-paybill', label: 'Paybill C2B' },
   { to: '/webhooks', label: 'Callbacks and status' },
-  { to: '/sms-api', label: 'Developer API' },
   { to: '/developers', label: 'API documentation' },
   { to: '/pricing', label: 'Pricing' },
 ]
@@ -33,14 +32,7 @@ const legalLinks = [
     <div class="mx-auto max-w-6xl px-4 py-14 sm:px-6 lg:px-8">
       <div class="grid gap-10 sm:grid-cols-2 lg:grid-cols-5">
         <div class="sm:col-span-2 lg:col-span-2">
-          <RouterLink to="/" class="inline-flex items-center gap-2.5">
-            <span
-              class="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-500 text-sm font-bold text-white"
-            >
-              N
-            </span>
-            <span class="font-serif text-lg font-bold text-white">Nova SMS</span>
-          </RouterLink>
+          <BrandLogo to="/" height-class="h-12" />
           <p class="mt-4 max-w-sm text-sm leading-relaxed text-slate-400">
             Bulk SMS for Kenyan businesses and events. Prepaid wallet, M-Pesa STK Push and Paybill
             top-up, delivery reports, and a REST API.

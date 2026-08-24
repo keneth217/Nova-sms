@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { Bars3Icon, XMarkIcon } from '@heroicons/vue/24/outline'
 import { useAuthStore } from '@/stores/auth.store'
+import BrandLogo from '@/components/common/BrandLogo.vue'
 
 const route = useRoute()
 const auth = useAuthStore()
@@ -32,14 +33,7 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
     "
   >
     <div class="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6 lg:px-8">
-      <RouterLink to="/" class="flex items-center gap-2.5" @click="open = false">
-        <span
-          class="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-600 text-sm font-bold text-white"
-        >
-          N
-        </span>
-        <span class="font-serif text-lg font-bold tracking-tight text-slate-900">Nova SMS</span>
-      </RouterLink>
+      <BrandLogo to="/" height-class="h-10" @click="open = false" />
 
       <nav class="hidden items-center gap-6 lg:flex">
         <RouterLink
@@ -48,20 +42,6 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
           active-class="!text-slate-900"
         >
           Home
-        </RouterLink>
-        <RouterLink
-          to="/sms-gateway"
-          class="text-sm font-medium text-slate-600 transition hover:text-slate-900"
-          active-class="!text-slate-900"
-        >
-          SMS gateway
-        </RouterLink>
-        <RouterLink
-          to="/sms-api"
-          class="text-sm font-medium text-slate-600 transition hover:text-slate-900"
-          active-class="!text-slate-900"
-        >
-          API
         </RouterLink>
         <RouterLink
           to="/developers"
@@ -139,12 +119,6 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
       <div class="flex flex-col gap-3">
         <RouterLink to="/" class="text-sm font-medium text-slate-900" @click="open = false">
           Home
-        </RouterLink>
-        <RouterLink to="/sms-gateway" class="text-sm font-medium text-slate-600" @click="open = false">
-          SMS gateway
-        </RouterLink>
-        <RouterLink to="/sms-api" class="text-sm font-medium text-slate-600" @click="open = false">
-          API
         </RouterLink>
         <RouterLink to="/developers" class="text-sm font-medium text-slate-600" @click="open = false">
           Documentation

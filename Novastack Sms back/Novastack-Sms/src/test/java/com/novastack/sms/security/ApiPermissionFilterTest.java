@@ -58,6 +58,47 @@ class ApiPermissionFilterTest {
     }
 
     @Test
+    void mpesaStkPathsRequireMpesaPermissions() {
+        assertEquals(ApiPermission.MPESA_STK_PUSH,
+                ApiPermissionFilter.requiredPermission("POST", "/api/v1/mpesa/stkpush"));
+        assertEquals(ApiPermission.MPESA_STK_PUSH,
+                ApiPermissionFilter.requiredPermission("POST", "/api/v1/mpesa/checkout"));
+        assertEquals(ApiPermission.MPESA_STATUS,
+                ApiPermissionFilter.requiredPermission("GET",
+                        "/api/v1/mpesa/transactions/11111111-1111-1111-1111-111111111111"));
+        assertEquals(ApiPermission.MPESA_STATUS,
+                ApiPermissionFilter.requiredPermission("GET",
+                        "/api/v1/mpesa/transactions/11111111-1111-1111-1111-111111111111/status"));
+        assertEquals(ApiPermission.MPESA_STATUS,
+                ApiPermissionFilter.requiredPermission("GET",
+                        "/api/v1/mpesa/checkout/11111111-1111-1111-1111-111111111111"));
+        assertEquals(ApiPermission.MPESA_STATUS,
+                ApiPermissionFilter.requiredPermission("GET",
+                        "/api/v1/mpesa/checkout/11111111-1111-1111-1111-111111111111/status"));
+        assertNull(ApiPermissionFilter.requiredPermission("POST", "/api/v1/mpesa/stk/callback"));
+        assertNull(ApiPermissionFilter.requiredPermission("POST", "/api/v1/mpesa/c2b/confirmation"));
+        assertNull(ApiPermissionFilter.requiredPermission("POST", "/api/v1/mpesa/c2b/validation"));
+        assertNull(ApiPermissionFilter.requiredPermission("POST", "/api/v1/payments/c2b/confirmation"));
+        assertNull(ApiPermissionFilter.requiredPermission("POST", "/api/v1/payments/transaction-status/result"));
+        assertNull(ApiPermissionFilter.requiredPermission("POST", "/api/v1/payments/transaction-status/timeout"));
+    }
+
+    @Test
+    void mpesaC2bClientPathsRequireC2bPermission() {
+        assertEquals(ApiPermission.MPESA_C2B,
+                ApiPermissionFilter.requiredPermission("GET", "/api/v1/mpesa/c2b"));
+        assertEquals(ApiPermission.MPESA_C2B,
+                ApiPermissionFilter.requiredPermission("GET", "/api/v1/mpesa/c2b/"));
+        assertEquals(ApiPermission.MPESA_C2B,
+                ApiPermissionFilter.requiredPermission("GET", "/api/v1/mpesa/c2b/transactions"));
+        assertEquals(ApiPermission.MPESA_C2B,
+                ApiPermissionFilter.requiredPermission("GET",
+                        "/api/v1/mpesa/c2b/transactions/11111111-1111-1111-1111-111111111111"));
+        assertEquals(ApiPermission.MPESA_C2B,
+                ApiPermissionFilter.requiredPermission("POST", "/api/v1/mpesa/c2b/verify"));
+    }
+
+    @Test
     void otherResourcesRemainForbiddenForScopedKeys() {
         assertNull(ApiPermissionFilter.requiredPermission("GET", "/api/v1/contacts"));
         assertNull(ApiPermissionFilter.requiredPermission("POST", "/api/v1/auth/login"));

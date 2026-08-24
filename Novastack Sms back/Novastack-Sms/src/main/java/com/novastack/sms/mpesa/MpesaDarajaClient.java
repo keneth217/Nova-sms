@@ -160,6 +160,77 @@ public class MpesaDarajaClient {
     }
 
     /**
+     * Asks Safaricom for the status of a Paybill/STK receipt when the C2B callback never arrived.
+     * Asynchronous: Daraja posts the result to {@code resultUrl}.
+     */
+    public TransactionStatusSubmitResult queryTransactionStatus(String transactionId, String resultUrl, String timeoutUrl) {
+        AppProperties.Mpesa mpesa = appProperties.getMpesa();
+        validateConfig(mpesa);
+        if (!MpesaSecurityCredential.configured(mpesa)) {
+            throw new ApiException(
+                    "M-Pesa Transaction Status is not configured. Set MPESA_INITIATOR_NAME and MPESA_SECURITY_CREDENTIAL.",
+                    HttpStatus.SERVICE_UNAVAILABLE);
+        }
+        if (isBlank(transactionId)) {
+            throw new ApiException("M-Pesa receipt is required", HttpStatus.BAD_REQUEST);
+        }
+
+        Map<String, Object> body = new java.util.LinkedHashMap<>();
+        body.put("Initiator", mpesa.getInitiatorName().trim());
+        body.put("SecurityCredential", MpesaSecurityCredential.resolve(mpesa));
+        body.put("CommandID", "TransactionStatusQuery");
+        body.put("TransactionID", transactionId.trim());
+        body.put("OriginatorConversationID", "");
+        body.put("PartyA", mpesa.getShortcode());
+        body.put("IdentifierType", "4");
+        body.put("ResultURL", resultUrl);
+        body.put("QueueTimeoutURL", timeoutUrl);
+        body.put("Remarks", "OK");
+        body.put("Occasion", "OK");
+
+        try {
+            String responseBody = restClientBuilder.build()
+                    .post()
+                    .uri(mpesa.getBaseUrl() + "/mpesa/transactionstatus/v1/query")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .header("Authorization", "Bearer " + getAccessToken())
+                    .body(body)
+                    .retrieve()
+                    .body(String.class);
+
+            JsonNode root = objectMapper.readTree(responseBody == null ? "{}" : responseBody);
+            String responseCode = firstText(root, "ResponseCode", "errorCode");
+            String description = firstText(root, "ResponseDescription", "errorMessage");
+            boolean accepted = "0".equals(responseCode)
+                    || (description != null && description.toLowerCase().contains("accept"));
+            if (!accepted) {
+                throw new ApiException(
+                        "M-Pesa Transaction Status failed: " + (description == null ? responseBody : description),
+                        HttpStatus.BAD_GATEWAY);
+            }
+            return new TransactionStatusSubmitResult(
+                    firstText(root, "OriginatorConversationID"),
+                    firstText(root, "ConversationID"),
+                    responseCode,
+                    description,
+                    responseBody);
+        } catch (ApiException ex) {
+            throw ex;
+        } catch (RestClientResponseException ex) {
+            log.warn("Daraja Transaction Status HTTP error: {}", ex.getResponseBodyAsString());
+            throw new ApiException("M-Pesa Transaction Status failed: " + ex.getResponseBodyAsString(),
+                    HttpStatus.BAD_GATEWAY);
+        } catch (Exception ex) {
+            log.error("Daraja Transaction Status error: {}", ex.getMessage(), ex);
+            throw new ApiException("M-Pesa Transaction Status failed: " + ex.getMessage(), HttpStatus.BAD_GATEWAY);
+        }
+    }
+
+    public boolean isTransactionStatusConfigured() {
+        return MpesaSecurityCredential.configured(appProperties.getMpesa());
+    }
+
+    /**
      * Register C2B v2 validation/confirmation URLs for the Paybill shortcode.
      * Safaricom rejects callback URLs that contain the word "mpesa".
      */
@@ -325,6 +396,15 @@ public class MpesaDarajaClient {
             return "";
         }
         return value.length() <= max ? value : value.substring(0, max);
+    }
+
+    public record TransactionStatusSubmitResult(
+            String originatorConversationId,
+            String conversationId,
+            String responseCode,
+            String responseDescription,
+            String rawResponse
+    ) {
     }
 
     public record C2bRegisterResult(

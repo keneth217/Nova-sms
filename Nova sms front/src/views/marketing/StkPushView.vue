@@ -26,7 +26,9 @@ import { RouterLink } from 'vue-router'
       <h2 class="text-xl font-semibold text-slate-900">How Nova SMS simplifies integration</h2>
       <p class="mt-2">
         Your application does not call Daraja directly for this product. You call Nova SMS
-        <code class="rounded bg-slate-100 px-1 py-0.5 font-mono text-sm">POST /api/v1/wallet/topup</code>
+        <code class="rounded bg-slate-100 px-1 py-0.5 font-mono text-sm">POST /api/v1/mpesa/stkpush</code>
+        or the Lipa Na M-Pesa Online alias
+        <code class="rounded bg-slate-100 px-1 py-0.5 font-mono text-sm">POST /api/v1/mpesa/checkout</code>
         with an amount in KES and the phone that should receive the prompt. Nova SMS talks to
         Safaricom, stores the pending transaction, and later credits the organization wallet once.
       </p>
@@ -38,7 +40,7 @@ import { RouterLink } from 'vue-router'
         <li>Nova SMS sends the STK request and returns a <code class="font-mono text-sm">transactionId</code> with status PENDING.</li>
         <li>The customer enters their M-Pesa PIN, cancels, or lets the prompt expire.</li>
         <li>Safaricom may send a callback to Nova SMS. You should still poll Nova SMS rather than trusting the PIN screen.</li>
-        <li>Call <code class="font-mono text-sm">POST /api/v1/wallet/topup/{id}/check</code> every few seconds while status is PENDING.</li>
+        <li>Call <code class="font-mono text-sm">GET /api/v1/mpesa/transactions/{id}/status</code> or <code class="font-mono text-sm">GET /api/v1/mpesa/checkout/{id}/status</code> every few seconds while status is PENDING.</li>
         <li>Stop when status is COMPLETED and <code class="font-mono text-sm">walletCredited</code> is true, or when status is FAILED.</li>
       </ol>
       <p class="mt-3">
@@ -51,7 +53,7 @@ import { RouterLink } from 'vue-router'
     <section>
       <h2 class="text-xl font-semibold text-slate-900">Callback handling and payment status</h2>
       <p class="mt-2">
-        Daraja callbacks are processed by Nova SMS. Credits are applied once per successful payment.
+        Daraja callbacks are processed by Nova SMS, not by your server. Credits are applied once per successful payment.
         Status never moves backwards: COMPLETED is not overwritten with PENDING or FAILED. Messages
         such as “the transaction is still under processing” stay PENDING — keep polling.
       </p>
@@ -67,8 +69,8 @@ import { RouterLink } from 'vue-router'
       </ul>
       <p class="mt-3">
         Request and response examples live in
-        <RouterLink to="/developers/wallet" class="font-medium text-brand-700 hover:underline">
-          the wallet API documentation
+        <RouterLink to="/developers/mpesa" class="font-medium text-brand-700 hover:underline">
+          the M-Pesa API documentation
         </RouterLink>.
       </p>
     </section>
@@ -77,6 +79,7 @@ import { RouterLink } from 'vue-router'
       :links="[
         { to: '/mpesa-paybill', label: 'M-Pesa Paybill C2B top-up' },
         { to: '/webhooks', label: 'How M-Pesa callbacks are processed' },
+        { to: '/developers/mpesa', label: 'M-Pesa API examples' },
         { to: '/developers/wallet', label: 'Wallet API examples' },
         { to: '/sms-api', label: 'SMS API overview' },
       ]"

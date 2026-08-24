@@ -5,6 +5,8 @@ import type {
   ApiClient,
   ApiClientCreated,
   ApiClientUsage,
+  ApiClientUsageOverview,
+  ApiRequestLogRow,
   CreateApiClientRequest,
   DeveloperConfig,
   UpdateApiClientRequest,
@@ -110,9 +112,24 @@ class ApiClientService {
     return data.data
   }
 
+  async usageOverview(): Promise<ApiClientUsageOverview> {
+    const { data } = await api.get<ApiResponse<ApiClientUsageOverview>>('/admin/developer/api-usage')
+    if (!data.success || !data.data) throw new Error(data.message || 'Failed to load API usage')
+    return data.data
+  }
+
   async usage(clientId: string): Promise<ApiClientUsage> {
     const { data } = await api.get<ApiResponse<ApiClientUsage>>(`/admin/api-clients/${clientId}/usage`)
     if (!data.success || !data.data) throw new Error(data.message || 'Failed to load API usage')
+    return data.data
+  }
+
+  async requestLogs(clientId: string, params: PageRequest = {}): Promise<Page<ApiRequestLogRow>> {
+    const { data } = await api.get<ApiResponse<Page<ApiRequestLogRow>>>(
+      `/admin/api-clients/${clientId}/requests`,
+      { params },
+    )
+    if (!data.success || !data.data) throw new Error(data.message || 'Failed to load API requests')
     return data.data
   }
 

@@ -18,6 +18,7 @@ public class IdempotencyService {
 
     public static final String TYPE_SMS = "SMS";
     public static final String TYPE_BATCH = "BATCH";
+    public static final String TYPE_STK = "STK";
 
     private final ApiIdempotencyKeyRepository repository;
 

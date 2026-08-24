@@ -2,6 +2,7 @@ package com.novastack.sms.config;
 
 import com.novastack.sms.security.ApiKeyAuthenticationFilter;
 import com.novastack.sms.security.ApiPermissionFilter;
+import com.novastack.sms.security.ApiRequestLogFilter;
 import com.novastack.sms.security.JsonAccessDeniedHandler;
 import com.novastack.sms.security.JsonAuthenticationEntryPoint;
 import com.novastack.sms.security.JwtAuthenticationFilter;
@@ -44,6 +45,7 @@ public class SecurityConfig {
     private final JsonAuthenticationEntryPoint authenticationEntryPoint;
     private final JsonAccessDeniedHandler accessDeniedHandler;
     private final UserDetailsService userDetailsService;
+    private final ApiRequestLogFilter apiRequestLogFilter;
 
     /**
      * Public Safaricom data-bundle endpoints — no JWT, no "Session expired" for anonymous callers.
@@ -82,7 +84,9 @@ public class SecurityConfig {
                                 "/api/v1/auth/reset-password",
                                 "/api/v1/organizations/register",
                                 "/api/v1/dlr/**",
-                                "/api/v1/mpesa/**",
+                                "/api/v1/mpesa/stk/callback",
+                                "/api/v1/mpesa/c2b/confirmation",
+                                "/api/v1/mpesa/c2b/validation",
                                 "/api/v1/payments/**",
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
@@ -94,6 +98,7 @@ public class SecurityConfig {
                         .anyRequest().authenticated()
                 )
                 .authenticationProvider(authenticationProvider())
+                .addFilterBefore(apiRequestLogFilter, ApiKeyAuthenticationFilter.class)
                 .addFilterBefore(apiKeyAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterAfter(apiPermissionFilter, JwtAuthenticationFilter.class)

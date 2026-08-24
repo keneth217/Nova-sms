@@ -77,6 +77,9 @@ public class ApiPermissionFilter extends OncePerRequestFilter {
         if (path.startsWith("/api/v1/sms")) {
             return requiredSmsPermission(method, path);
         }
+        if (path.startsWith("/api/v1/mpesa")) {
+            return requiredMpesaPermission(method, path);
+        }
         if (path.startsWith("/api/v1/wallet")) {
             return requiredWalletPermission(method, path);
         }
@@ -113,6 +116,41 @@ public class ApiPermissionFilter extends OncePerRequestFilter {
             return ApiPermission.SMS_STATUS;
         }
         return ApiPermission.SMS_SEND;
+    }
+
+    private static ApiPermission requiredMpesaPermission(String method, String path) {
+        if ("POST".equalsIgnoreCase(method)
+                && (path.endsWith("/mpesa/stkpush") || path.endsWith("/mpesa/checkout"))) {
+            return ApiPermission.MPESA_STK_PUSH;
+        }
+        if ("GET".equalsIgnoreCase(method) && path.matches("/api/v1/mpesa/checkout/[^/]+/status$")) {
+            return ApiPermission.MPESA_STATUS;
+        }
+        if ("GET".equalsIgnoreCase(method) && path.matches("/api/v1/mpesa/checkout/[^/]+$")) {
+            return ApiPermission.MPESA_STATUS;
+        }
+        if ("GET".equalsIgnoreCase(method) && path.matches("/api/v1/mpesa/transactions/[^/]+/status$")) {
+            return ApiPermission.MPESA_STATUS;
+        }
+        if ("GET".equalsIgnoreCase(method) && path.matches("/api/v1/mpesa/transactions/[^/]+$")) {
+            return ApiPermission.MPESA_STATUS;
+        }
+        if ("GET".equalsIgnoreCase(method) && path.matches("/api/v1/mpesa/c2b/transactions/[^/]+$")) {
+            return ApiPermission.MPESA_C2B;
+        }
+        if ("GET".equalsIgnoreCase(method)
+                && (path.equals("/api/v1/mpesa/c2b/transactions")
+                || path.equals("/api/v1/mpesa/c2b/transactions/"))) {
+            return ApiPermission.MPESA_C2B;
+        }
+        if ("GET".equalsIgnoreCase(method)
+                && (path.equals("/api/v1/mpesa/c2b") || path.equals("/api/v1/mpesa/c2b/"))) {
+            return ApiPermission.MPESA_C2B;
+        }
+        if ("POST".equalsIgnoreCase(method) && path.endsWith("/mpesa/c2b/verify")) {
+            return ApiPermission.MPESA_C2B;
+        }
+        return null;
     }
 
     private static ApiPermission requiredWalletPermission(String method, String path) {

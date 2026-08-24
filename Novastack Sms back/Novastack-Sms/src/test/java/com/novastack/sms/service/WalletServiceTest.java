@@ -4,6 +4,7 @@ import com.novastack.sms.config.AppProperties;
 import com.novastack.sms.domain.entity.Organization;
 import com.novastack.sms.domain.entity.Wallet;
 import com.novastack.sms.domain.entity.WalletTransaction;
+import com.novastack.sms.domain.repository.MpesaTransactionStatusQueryRepository;
 import com.novastack.sms.domain.repository.OrganizationRepository;
 import com.novastack.sms.domain.repository.WalletRepository;
 import com.novastack.sms.domain.repository.WalletTransactionRepository;
@@ -51,6 +52,8 @@ class WalletServiceTest {
     private PaybillCollectionService paybillCollectionService;
     @Mock
     private C2bInboundService c2bInboundService;
+    @Mock
+    private MpesaTransactionStatusQueryRepository transactionStatusQueryRepository;
 
     private WalletService walletService;
     private Organization organization;
@@ -68,7 +71,8 @@ class WalletServiceTest {
                 smsBillingCalculator,
                 orgNotificationService,
                 paybillCollectionService,
-                c2bInboundService);
+                c2bInboundService,
+                transactionStatusQueryRepository);
         organization = Organization.builder()
                 .id(UUID.randomUUID())
                 .name("Acme")

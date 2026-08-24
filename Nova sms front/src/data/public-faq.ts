@@ -12,7 +12,7 @@ export const publicFaqs: FaqItem[] = [
   {
     question: 'How does Nova SMS M-Pesa STK Push work?',
     answer:
-      'STK Push funds your Nova SMS wallet. You enter an amount and an M-Pesa phone number. Safaricom prompts that phone for a PIN. When the payment succeeds, Nova SMS credits the organization wallet once. Partner apps can start the same flow through POST /api/v1/wallet/topup and must poll Nova SMS until walletCredited is true.',
+      'STK Push funds your Nova SMS wallet. You enter an amount and an M-Pesa phone number. Safaricom prompts that phone for a PIN. When the payment succeeds, Nova SMS credits the organization wallet once. Partner apps can start the same flow through POST /api/v1/mpesa/stkpush and must poll GET /api/v1/mpesa/transactions/{id}/status until walletCredited is true.',
   },
   {
     question: 'Can I integrate Nova SMS into my website or backend?',
@@ -22,12 +22,12 @@ export const publicFaqs: FaqItem[] = [
   {
     question: 'Does Nova SMS support C2B Paybill payments?',
     answer:
-      'Yes, for wallet funding. Pay to the platform Paybill using your organization account number (the M-Pesa account reference shown in Settings, such as NOVAC727). The BillRefNumber identifies the organization. Nova SMS credits that wallet from the Safaricom C2B confirmation. Do not send an organizationId from a client to choose who gets credited.',
+      'Yes, for wallet funding. GET /api/v1/mpesa/c2b returns the platform Paybill and your organization account number (for example NOVAC727). The customer pays that Paybill. Safaricom posts the C2B confirmation to Nova SMS, not to your server. Then POST /api/v1/mpesa/c2b/verify with the M-Pesa receipt. Do not send an organizationId to choose who gets credited — BillRefNumber decides.',
   },
   {
     question: 'Does Nova SMS provide payment webhooks to my server?',
     answer:
-      'Safaricom sends STK and C2B callbacks to Nova SMS. Your application should treat Nova SMS as the source of truth: poll POST /api/v1/wallet/topup/{id}/check until the status is COMPLETED and walletCredited is true, or FAILED. SMS delivery status is read from GET /api/v1/sms/{id}/status.',
+      'Safaricom sends STK and C2B callbacks to Nova SMS. Clients do not configure or implement those callbacks. Initiate payment through the Nova SMS API and retrieve status with GET /api/v1/mpesa/transactions/{id}/status or GET /api/v1/mpesa/c2b/transactions. SMS delivery status is GET /api/v1/sms/{id}/status.',
   },
   {
     question: 'Is Nova SMS available for businesses in Kenya?',
@@ -47,6 +47,6 @@ export const publicFaqs: FaqItem[] = [
   {
     question: 'How are payment callbacks handled?',
     answer:
-      'Daraja STK callbacks and C2B confirmation payloads are processed by Nova SMS. Credits are applied once per M-Pesa receipt. If a callback is delayed, POST /api/v1/wallet/topup/{id}/check can query Safaricom and complete a pending STK. Duplicate receipts are not credited twice.',
+      'Clients do not configure or implement Safaricom callbacks. Nova SMS handles STK and C2B internally. Poll GET /api/v1/mpesa/transactions/{id}/status or GET /api/v1/mpesa/c2b/transactions. Duplicate receipts are not credited twice.',
   },
 ]

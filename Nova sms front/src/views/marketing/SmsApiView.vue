@@ -29,24 +29,35 @@ import { RouterLink } from 'vue-router'
         Send one message with <code class="font-mono text-sm">POST /api/v1/sms/send</code>. Bulk and
         scheduled sends use <code class="font-mono text-sm">/sms/bulk</code> and
         <code class="font-mono text-sm">/sms/schedule</code>. To fund the same organization wallet
-        from your product, grant WALLET_TOPUP and call
-        <code class="font-mono text-sm">POST /api/v1/wallet/topup</code>.
+        from your product, grant MPESA_STK_PUSH (or WALLET_TOPUP) and call
+        <code class="font-mono text-sm">POST /api/v1/mpesa/stkpush</code>
+        or the checkout alias
+        <code class="font-mono text-sm">POST /api/v1/mpesa/checkout</code>.
+        For Paybill C2B, grant MPESA_C2B (or WALLET_READ) and call
+        <code class="font-mono text-sm">GET /api/v1/mpesa/c2b</code>.
       </p>
     </section>
 
     <section>
       <h2 class="text-xl font-semibold text-slate-900">Checking payment and message status</h2>
       <p class="mt-2">
-        Poll STK with <code class="font-mono text-sm">POST /api/v1/wallet/topup/{id}/check</code>.
-        Read SMS with <code class="font-mono text-sm">GET /api/v1/sms/{id}/status</code>. Nova SMS
-        is the source of truth for both.
+        Poll STK or checkout with
+        <code class="font-mono text-sm">GET /api/v1/mpesa/transactions/{id}/status</code>
+        (or
+        <code class="font-mono text-sm">GET /api/v1/mpesa/checkout/{id}/status</code>).
+        After a Paybill payment, call
+        <code class="font-mono text-sm">POST /api/v1/mpesa/c2b/verify</code>
+        with the M-Pesa receipt. Read SMS with
+        <code class="font-mono text-sm">GET /api/v1/sms/{id}/status</code>. Nova SMS
+        is the source of truth for all of these.
       </p>
     </section>
 
     <section>
       <h2 class="text-xl font-semibold text-slate-900">Callbacks and errors</h2>
       <p class="mt-2">
-        Safaricom callbacks terminate at Nova SMS. Your error handling should read HTTP status and
+        Safaricom callbacks terminate at Nova SMS. You do not receive Daraja posts on your
+        server. Your error handling should read HTTP status and
         the JSON <code class="font-mono text-sm">message</code> field. Typical cases are an invalid
         key, missing permission, insufficient wallet balance, or a validation error on the recipient.
       </p>
@@ -67,7 +78,8 @@ import { RouterLink } from 'vue-router'
       :links="[
         { to: '/developers/quick-start', label: 'Quick start: send your first SMS' },
         { to: '/developers/authentication', label: 'API authentication' },
-        { to: '/developers/wallet', label: 'M-Pesa STK Push API example' },
+        { to: '/developers/wallet', label: 'Wallet API example' },
+        { to: '/developers/mpesa', label: 'M-Pesa STK Push API' },
         { to: '/webhooks', label: 'Payment callbacks and polling' },
       ]"
     />

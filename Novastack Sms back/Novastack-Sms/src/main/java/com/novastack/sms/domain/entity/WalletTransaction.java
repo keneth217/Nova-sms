@@ -98,6 +98,10 @@ public class WalletTransaction {
     @Column(name = "bill_ref", length = 32)
     private String billRef;
 
+    /** Scoped API client that initiated this STK / wallet top-up, if any. */
+    @Column(name = "api_client_id")
+    private UUID apiClientId;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

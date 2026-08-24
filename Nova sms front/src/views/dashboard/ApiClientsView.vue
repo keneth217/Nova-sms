@@ -172,7 +172,7 @@ async function revoke(client: ApiClient) {
   <div>
     <PageHeader
       title="API clients"
-      description="Issue Nova SMS keys for your own apps. Grant WALLET_READ and WALLET_TOPUP so those apps can show balance and accept M-Pesa top-ups on their own site."
+      description="Issue a separate Nova SMS key for each application (Mwalimu, Chamaplus, POS, and others). Do not share keys. Grant only the SMS, wallet, and M-Pesa permissions that app needs."
     >
       <template #actions>
         <AppButton @click="openCreate">New API client</AppButton>
@@ -281,7 +281,7 @@ async function revoke(client: ApiClient) {
         </FormField>
         <FormField
           label="Permissions"
-          hint="WALLET_READ and WALLET_TOPUP let the integrating app show balance and top up on its own site instead of the Nova SMS portal."
+          hint="Create one client per application. Grant only what that app needs: SMS_*, WALLET_READ, WALLET_TOPUP or MPESA_STK_PUSH / MPESA_C2B."
         >
           <div class="flex flex-col gap-2">
             <label

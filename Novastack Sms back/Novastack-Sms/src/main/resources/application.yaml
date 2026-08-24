@@ -105,6 +105,11 @@ novastack:
     base-url: ${MPESA_BASE_URL:https://api.safaricom.co.ke}
     account-reference-prefix: NOVA
     transaction-desc: Novastack SMS top-up
+    # Transaction Status (internal C2B fallback). Clients never call Daraja.
+    initiator-name: ${MPESA_INITIATOR_NAME:}
+    initiator-password: ${MPESA_INITIATOR_PASSWORD:}
+    security-credential: ${MPESA_SECURITY_CREDENTIAL:}
+    initiator-certificate-path: ${MPESA_INITIATOR_CERT:}
     collection-accounts:
       - SHEILA
       - KENETH

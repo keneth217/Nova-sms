@@ -14,6 +14,13 @@ const origin = originFromVite()
 const slug = computed(() => String(route.params.slug || ''))
 const page = computed(() => buildDeveloperPages(origin)[slug.value])
 const seo = computed(() => publicDocSeo[slug.value as PublicDocSlug])
+const mpesaPage = computed(() => slug.value === 'wallet' || slug.value.startsWith('mpesa'))
+const mpesaNavLabels = ['M-Pesa API', 'Call from your app']
+const navGroups = computed(() =>
+  publicDeveloperNav.filter((group) =>
+    mpesaPage.value ? mpesaNavLabels.includes(group.label) : !mpesaNavLabels.includes(group.label),
+  ),
+)
 
 useSeo(() => {
   if (!page.value) {
@@ -54,8 +61,24 @@ useSeo(() => {
       <div class="mx-auto grid max-w-6xl gap-10 lg:grid-cols-[16rem_minmax(0,1fr)]">
         <aside class="lg:pt-2">
           <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Documentation</p>
-          <nav class="mt-3 space-y-5 text-sm">
-            <div v-for="group in publicDeveloperNav" :key="group.label">
+          <div class="mt-3 inline-flex rounded-xl border border-slate-200 p-1">
+            <RouterLink
+              to="/developers/quick-start"
+              class="rounded-lg px-3 py-1.5 text-xs font-semibold"
+              :class="mpesaPage ? 'text-slate-600' : 'bg-brand-50 text-brand-700'"
+            >
+              SMS
+            </RouterLink>
+            <RouterLink
+              to="/developers/mpesa"
+              class="rounded-lg px-3 py-1.5 text-xs font-semibold"
+              :class="mpesaPage ? 'bg-brand-50 text-brand-700' : 'text-slate-600'"
+            >
+              M-Pesa
+            </RouterLink>
+          </div>
+          <nav class="mt-4 space-y-5 text-sm">
+            <div v-for="group in navGroups" :key="group.label">
               <p class="font-semibold text-slate-800">{{ group.label }}</p>
               <ul class="mt-2 space-y-1">
                 <li v-for="item in group.items" :key="item.id">
@@ -72,7 +95,9 @@ useSeo(() => {
           </nav>
         </aside>
         <article>
-          <p class="text-sm font-semibold uppercase tracking-wider text-brand-700">Nova SMS API</p>
+          <p class="text-sm font-semibold uppercase tracking-wider text-brand-700">
+            {{ mpesaPage ? 'Nova M-Pesa API' : 'Nova SMS API' }}
+          </p>
           <h1 class="mt-2 font-serif text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
             {{ page.title }}
           </h1>

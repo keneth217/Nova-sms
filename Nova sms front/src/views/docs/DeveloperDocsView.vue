@@ -8,6 +8,10 @@ import CtaBanner from '@/components/marketing/CtaBanner.vue'
 
 const origin = originFromVite()
 const overview = computed(() => buildDeveloperPages(origin).overview)
+const smsGroups = computed(() => publicDeveloperNav.filter((g) => g.label !== 'M-Pesa API'))
+const mpesaGroups = computed(() =>
+  publicDeveloperNav.filter((g) => g.label === 'M-Pesa API' || g.label === 'Call from your app'),
+)
 
 const pageTitle = 'Nova SMS API documentation'
 const pageDescription =
@@ -41,21 +45,41 @@ const pageDescription =
 
       <p class="mt-8 text-slate-600">{{ overview?.description }}</p>
 
-      <nav class="mt-10 space-y-8" aria-label="API documentation">
-        <section v-for="group in publicDeveloperNav" :key="group.label">
-          <h2 class="text-lg font-semibold text-slate-900">{{ group.label }}</h2>
-          <ul class="mt-3 divide-y divide-slate-100 rounded-xl border border-slate-200">
-            <li v-for="item in group.items" :key="item.id">
-              <RouterLink
-                :to="item.to"
-                class="flex items-center justify-between px-4 py-3 text-sm font-medium text-brand-700 hover:bg-slate-50"
-              >
-                {{ item.label }}
-                <span class="text-slate-400" aria-hidden="true">→</span>
-              </RouterLink>
-            </li>
-          </ul>
-        </section>
+      <nav class="mt-10 space-y-10" aria-label="API documentation">
+        <div>
+          <h2 id="sms-docs" class="text-lg font-semibold text-slate-900">SMS</h2>
+          <section v-for="group in smsGroups" :key="group.label" class="mt-6">
+            <h3 class="text-sm font-semibold uppercase tracking-wider text-slate-500">{{ group.label }}</h3>
+            <ul class="mt-3 divide-y divide-slate-100 rounded-xl border border-slate-200">
+              <li v-for="item in group.items" :key="item.id">
+                <RouterLink
+                  :to="item.to"
+                  class="flex items-center justify-between px-4 py-3 text-sm font-medium text-brand-700 hover:bg-slate-50"
+                >
+                  {{ item.label }}
+                  <span class="text-slate-400" aria-hidden="true">→</span>
+                </RouterLink>
+              </li>
+            </ul>
+          </section>
+        </div>
+        <div>
+          <h2 id="mpesa-docs" class="text-lg font-semibold text-slate-900">M-Pesa</h2>
+          <section v-for="group in mpesaGroups" :key="group.label" class="mt-6">
+            <h3 class="text-sm font-semibold uppercase tracking-wider text-slate-500">{{ group.label }}</h3>
+            <ul class="mt-3 divide-y divide-slate-100 rounded-xl border border-slate-200">
+              <li v-for="item in group.items" :key="item.id">
+                <RouterLink
+                  :to="item.to"
+                  class="flex items-center justify-between px-4 py-3 text-sm font-medium text-brand-700 hover:bg-slate-50"
+                >
+                  {{ item.label }}
+                  <span class="text-slate-400" aria-hidden="true">→</span>
+                </RouterLink>
+              </li>
+            </ul>
+          </section>
+        </div>
       </nav>
 
       <div class="mt-10">

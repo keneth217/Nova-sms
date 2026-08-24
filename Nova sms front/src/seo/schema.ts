@@ -8,7 +8,7 @@ export function organizationSchema() {
     name: SITE_NAME,
     url: `${SITE_ORIGIN}/`,
     email: CONTACT_EMAIL,
-    logo: ogImageUrl('/apple-touch-icon.png'),
+    logo: ogImageUrl('/novasmslogo.png'),
     areaServed: {
       '@type': 'Country',
       name: 'Kenya',

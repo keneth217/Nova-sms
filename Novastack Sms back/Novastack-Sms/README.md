@@ -180,7 +180,23 @@ Content-Type: application/json
 { "recipient": "254712345678", "message": "Your payment has been received." }
 ```
 
-Keys are hashed at rest (`api_clients`). Permissions: `SMS_SEND`, `SMS_BULK`, `SMS_STATUS`, `SMS_HISTORY`, `WALLET_READ`, `WALLET_TOPUP`. Per-client rate limits return HTTP 429. Both dashboard and API clients call the same `SmsService` and organization wallet. TalkSasa credentials never leave the backend.
+Keys are hashed at rest (`api_clients`). Permissions: `SMS_SEND`, `SMS_BULK`, `SMS_STATUS`, `SMS_HISTORY`, `WALLET_READ`, `WALLET_TOPUP`, `MPESA_STK_PUSH`, `MPESA_STATUS`, `MPESA_C2B`. Per-client rate limits return HTTP 429. Both dashboard and API clients call the same `SmsService` and organization wallet. TalkSasa credentials never leave the backend.
+
+Internal apps start M-Pesa STK / Lipa Na M-Pesa Online checkout with:
+
+```http
+POST /api/v1/mpesa/stkpush
+POST /api/v1/mpesa/checkout
+X-API-Key: nova_live_xxxxxxxxx
+Idempotency-Key: order-123456
+Content-Type: application/json
+
+{ "amount": 500, "phoneNumber": "254712345678" }
+```
+
+Poll `GET /api/v1/mpesa/transactions/{transactionId}/status` (or `GET /api/v1/mpesa/checkout/{id}/status`) until `status` is `COMPLETED` and `walletCredited` is `true`. Safaricom callbacks stay on `POST /api/v1/mpesa/stk/callback`. Clients do not receive those posts.
+
+Paybill C2B: `GET /api/v1/mpesa/c2b` for paybill and account, then `POST /api/v1/mpesa/c2b/verify` with the M-Pesa receipt. Safaricom C2B confirmation is posted to this backend, not to the integrating app. Daraja credentials never leave the backend.
 
 ### Contacts, groups & Excel import
 
@@ -323,6 +339,10 @@ Do not wait only on `callbackReceived` — a successful STK query can credit the
 | `MPESA_CONSUMER_SECRET` | Daraja app consumer secret |
 | `MPESA_CALLBACK_BASE_URL` | Public HTTPS base URL (e.g. `https://smsapi.novastack.co.ke`) |
 | `MPESA_BASE_URL` | `https://sandbox.safaricom.co.ke` or `https://api.safaricom.co.ke` |
+| `MPESA_INITIATOR_NAME` | API operator username (Transaction Status fallback) |
+| `MPESA_SECURITY_CREDENTIAL` | Encrypted initiator password (preferred) |
+| `MPESA_INITIATOR_PASSWORD` | Plain initiator password if you encrypt at runtime with the Safaricom `.cer` |
+| `MPESA_INITIATOR_CERT` | Path to the Safaricom initiator certificate |
 
 Register this callback in Daraja / ensure it is reachable:
 
@@ -335,7 +355,11 @@ Optional C2B v2 (Paybill 5687394): account number = org `mpesaAccountRef`. `Tran
 ```
 {MPESA_CALLBACK_BASE_URL}/api/v1/payments/c2b/confirmation
 {MPESA_CALLBACK_BASE_URL}/api/v1/payments/c2b/validation
+{MPESA_CALLBACK_BASE_URL}/api/v1/payments/transaction-status/result
+{MPESA_CALLBACK_BASE_URL}/api/v1/payments/transaction-status/timeout
 ```
+
+Transaction Status is Nova-internal. If C2B confirmation never arrives, `POST /api/v1/mpesa/c2b/verify` asks Daraja using Nova’s initiator credentials. Clients never call `/mpesa/transactionstatus/v1/query`.
 
 ### Send SMS
 
@@ -498,6 +522,7 @@ Client (JWT / API Key)
 | `MPESA_SHORTCODE` / `novastack.mpesa.shortcode` | Paybill shortcode |
 | `MPESA_PASSKEY` | STK passkey |
 | `MPESA_CONSUMER_KEY` / `MPESA_CONSUMER_SECRET` | Daraja credentials |
+| `MPESA_INITIATOR_NAME` / `MPESA_SECURITY_CREDENTIAL` | Transaction Status (internal C2B fallback) |
 | `MPESA_CALLBACK_BASE_URL` | Public HTTPS URL for callbacks |
 | `novastack.sms.default-cost` | Default SMS unit cost |
 | `novastack.sms.max-retries` | Provider retry attempts |

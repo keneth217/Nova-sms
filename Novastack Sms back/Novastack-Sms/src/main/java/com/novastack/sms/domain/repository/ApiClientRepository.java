@@ -22,6 +22,9 @@ public interface ApiClientRepository extends JpaRepository<ApiClient, UUID> {
 
     List<ApiClient> findByOrganizationIdOrderByCreatedAtDesc(UUID organizationId);
 
+    @Query("SELECT c FROM ApiClient c JOIN FETCH c.organization ORDER BY c.name ASC")
+    List<ApiClient> findAllWithOrganization();
+
     Page<ApiClient> findAllByOrderByCreatedAtDesc(Pageable pageable);
 
     Page<ApiClient> findByOrganizationIdOrderByCreatedAtDesc(UUID organizationId, Pageable pageable);

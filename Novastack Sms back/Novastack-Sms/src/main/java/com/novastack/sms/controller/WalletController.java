@@ -12,9 +12,13 @@ import com.novastack.sms.dto.response.WalletBalanceResponse;
 import com.novastack.sms.dto.response.WalletTransactionResponse;
 import com.novastack.sms.security.SecurityUtils;
 import com.novastack.sms.security.UserPrincipal;
+import com.novastack.sms.service.IdempotencyService;
 import com.novastack.sms.service.WalletService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -38,6 +42,7 @@ import java.util.UUID;
 public class WalletController {
 
     private final WalletService walletService;
+    private final IdempotencyService idempotencyService;
 
     @GetMapping("/balance")
     @Operation(
@@ -51,13 +56,31 @@ public class WalletController {
     @PostMapping("/topup")
     @Operation(summary = "Top up wallet via M-Pesa Daraja STK Push to platform Paybill",
             description = """
-                    Triggers Lipa Na M-Pesa STK on the user's phone. Wallet is credited after successful payment callback.
-                    Dashboard JWT or scoped API key with WALLET_TOPUP. Call this from your backend so users can top up on your site without the Nova SMS portal.
+      Triggers Lipa Na M-Pesa STK on the user's phone. Internally the same as POST /api/v1/mpesa/stkpush.
+      Wallet is credited after Nova receives the Safaricom callback — clients do not implement that callback.
+      Poll the returned transactionId. Optional Idempotency-Key (for example learner-839-payment-2026-08-24)
+      replays the original STK if the HTTP client times out.
                     """)
-    public ApiResponse<StkPushResponse> topup(@Valid @RequestBody WalletTopupRequest request) {
+    @Parameter(name = MpesaController.IDEMPOTENCY_HEADER, in = ParameterIn.HEADER, required = false,
+            description = "Unique request id. Reuse with the same body to avoid a duplicate STK Push.")
+    public ApiResponse<StkPushResponse> topup(
+            @Valid @RequestBody WalletTopupRequest request,
+            HttpServletRequest http) {
         UUID orgId = SecurityUtils.requireOrganizationId();
-        return ApiResponse.ok("STK Push sent. Enter M-Pesa PIN on your phone.",
-                walletService.initiateTopUp(orgId, request));
+        UUID clientId = SecurityUtils.optionalApiClientId().orElse(null);
+        String idempotencyKey = http.getHeader(MpesaController.IDEMPOTENCY_HEADER);
+        String hash = MpesaController.stkRequestHash(request);
+        StkPushResponse data = idempotencyService.replayOrRun(
+                clientId,
+                idempotencyKey,
+                hash,
+                IdempotencyService.TYPE_STK,
+                () -> {
+                    StkPushResponse sent = walletService.initiateTopUp(orgId, request);
+                    return new IdempotencyService.ReplayResult<>(sent, sent.getTransactionId());
+                },
+                resourceId -> walletService.getTopUpStatus(orgId, resourceId));
+        return ApiResponse.ok("STK Push sent. Enter M-Pesa PIN on your phone.", data);
     }
 
     @GetMapping("/topup/{transactionId}")

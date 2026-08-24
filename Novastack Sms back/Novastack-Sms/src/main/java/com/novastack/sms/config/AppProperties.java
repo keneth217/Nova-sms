@@ -128,6 +128,17 @@ public class AppProperties {
         private String accountReferencePrefix = "NOVA";
         private String transactionDesc = "Novastack SMS wallet top-up";
         /**
+         * API operator username from the M-Pesa portal. Required for Transaction Status
+         * (internal C2B reconciliation). Not used by client applications.
+         */
+        private String initiatorName = "";
+        /** Plain initiator password. Used only when {@code securityCredential} is empty. */
+        private String initiatorPassword = "";
+        /** Pre-encrypted Daraja SecurityCredential. Preferred over encrypting the password at runtime. */
+        private String securityCredential = "";
+        /** Path or classpath location of the Safaricom initiator .cer (production or sandbox). */
+        private String initiatorCertificatePath = "";
+        /**
          * Paybill account numbers that are recorded for stats only.
          * They never credit an organization wallet.
          */

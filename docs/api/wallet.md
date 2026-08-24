@@ -2,6 +2,10 @@
 
 Show organization SMS credit and accept M-Pesa STK top-ups from **your own site**. Users do not need the Nova SMS organization portal.
 
+For STK / checkout, Safaricom callbacks (Nova-owned), and Paybill C2B, see [M-Pesa](mpesa.md).
+
+`POST /api/v1/wallet/topup` **internally uses** `POST /api/v1/mpesa/stkpush`. The organization is paying into its Nova SMS wallet. Prefer `/mpesa/stkpush` for new client apps; wallet top-up is the same STK with `WALLET_TOPUP`.
+
 ```http
 GET  /api/v1/wallet/balance
 GET  /api/v1/wallet/transactions
@@ -9,6 +13,22 @@ POST /api/v1/wallet/topup
 GET  /api/v1/wallet/topup/{transactionId}
 POST /api/v1/wallet/topup/{transactionId}/check
 ```
+
+```text
+Client Application
+       ↓
+Nova SMS Wallet Top-up  (POST /api/v1/wallet/topup)
+       ↓
+M-Pesa STK              (same as POST /api/v1/mpesa/stkpush)
+       ↓
+Safaricom
+       ↓
+Nova SMS callback       (not your server)
+       ↓
+Wallet credited
+```
+
+Check the top-up with the returned `transactionId`: `GET /api/v1/mpesa/transactions/{id}/status` or `POST /api/v1/wallet/topup/{id}/check`. Clients do not implement Safaricom callbacks.
 
 Permissions for scoped API clients:
 
@@ -28,9 +48,13 @@ User on your site
    ↓
 Your backend
    ↓
-Nova SMS wallet API
+Nova SMS wallet top-up
    ↓
-M-Pesa STK Push
+M-Pesa STK (Nova → Daraja)
+   ↓
+Safaricom callback → Nova SMS
+   ↓
+Wallet credited
 ```
 
 Never put the Nova SMS API key in frontend JavaScript. Your UI calls **your** backend; your backend calls Nova SMS.

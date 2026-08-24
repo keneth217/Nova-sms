@@ -12,7 +12,7 @@ class DeveloperPortalServiceTest {
         AppProperties properties = new AppProperties();
         properties.getApi().setPublicBaseUrl("https://smsapi.novastack.co.ke/");
         DeveloperPortalService service = new DeveloperPortalService(
-                properties, null, null, null, null, null);
+                properties, null, null, null, null, null, null, null);
 
         var config = service.publicConfig();
         assertEquals("https://smsapi.novastack.co.ke", config.getPublicBaseUrl());

@@ -4,13 +4,16 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.novastack.sms.config.AppProperties;
 import com.novastack.sms.domain.entity.MpesaC2bInbound;
+import com.novastack.sms.domain.entity.MpesaTransactionStatusQuery;
 import com.novastack.sms.domain.entity.Organization;
 import com.novastack.sms.domain.entity.PaybillCollection;
 import com.novastack.sms.domain.entity.Wallet;
 import com.novastack.sms.domain.entity.WalletTransaction;
 import com.novastack.sms.domain.enums.PaymentMethod;
 import com.novastack.sms.domain.enums.TopupStatus;
+import com.novastack.sms.domain.enums.TransactionStatusQueryState;
 import com.novastack.sms.domain.enums.WalletTransactionType;
+import com.novastack.sms.domain.repository.MpesaTransactionStatusQueryRepository;
 import com.novastack.sms.domain.repository.OrganizationRepository;
 import com.novastack.sms.domain.repository.WalletRepository;
 import com.novastack.sms.domain.repository.WalletTransactionRepository;
@@ -73,6 +76,8 @@ class WalletServiceStkTopupTest {
     private PaybillCollectionService paybillCollectionService;
     @Mock
     private C2bInboundService c2bInboundService;
+    @Mock
+    private MpesaTransactionStatusQueryRepository transactionStatusQueryRepository;
 
     private WalletService walletService;
     private Organization organization;
@@ -90,7 +95,8 @@ class WalletServiceStkTopupTest {
                 smsBillingCalculator,
                 orgNotificationService,
                 paybillCollectionService,
-                c2bInboundService);
+                c2bInboundService,
+                transactionStatusQueryRepository);
         organization = Organization.builder()
                 .id(UUID.randomUUID())
                 .name("Acme")
@@ -670,6 +676,66 @@ class WalletServiceStkTopupTest {
         verify(walletRepository, never()).save(any());
     }
 
+    @Test
+    void verifyReceiptQueriesSafaricomWhenCallbackIsMissing() {
+        when(mpesaDarajaClient.isTransactionStatusConfigured()).thenReturn(true);
+        when(transactionStatusQueryRepository
+                .findFirstByMpesaReceiptIgnoreCaseAndStatusAndCreatedAtAfterOrderByCreatedAtDesc(
+                        eq("UHJA541HGH"), eq(TransactionStatusQueryState.PENDING), any(Instant.class)))
+                .thenReturn(Optional.empty());
+        when(mpesaDarajaClient.queryTransactionStatus(eq("UHJA541HGH"), any(), any()))
+                .thenReturn(new MpesaDarajaClient.TransactionStatusSubmitResult(
+                        "orig-1", "conv-1", "0", "Accept the service request successfully.", "{}"));
+        when(transactionStatusQueryRepository.save(any(MpesaTransactionStatusQuery.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        var result = walletService.verifyReceipt(organization.getId(), "UHJA541HGH");
+
+        assertFalse(result.isFound());
+        assertEquals("SAFARICOM_QUERY", result.getSource());
+        assertFalse(result.isNeedsManualRecovery());
+        verify(mpesaDarajaClient).queryTransactionStatus(eq("UHJA541HGH"),
+                eq("https://smsapi.novastack.co.ke/api/v1/payments/transaction-status/result"),
+                eq("https://smsapi.novastack.co.ke/api/v1/payments/transaction-status/timeout"));
+    }
+
+    @Test
+    void transactionStatusResultCreditsFromSafaricomBillRef() throws Exception {
+        stubC2bOrg();
+        stubCredit();
+        when(walletTransactionRepository.findByReference("UHJA541HGH")).thenReturn(Optional.empty());
+        when(walletTransactionRepository.findByMpesaReceipt("UHJA541HGH")).thenReturn(Optional.empty());
+        when(walletTransactionRepository.findC2bAttachCandidates(eq(organization.getId()), any(), any(Instant.class)))
+                .thenReturn(List.of());
+        when(walletTransactionRepository.save(any(WalletTransaction.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(transactionStatusQueryRepository.findFirstByOriginatorConversationId("orig-1"))
+                .thenReturn(Optional.empty());
+        when(transactionStatusQueryRepository.save(any(MpesaTransactionStatusQuery.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        walletService.handleTransactionStatusResult(transactionStatusResultJson(
+                "UHJA541HGH", "100.00", BILL_REF, "Completed"));
+
+        assertEquals(0, new BigDecimal("110.00").compareTo(wallet.getBalance()));
+        verify(walletRepository).save(wallet);
+        verify(c2bInboundService).markCredited("UHJA541HGH");
+    }
+
+    @Test
+    void transactionStatusResultDoesNotCreditWithoutBillRef() throws Exception {
+        when(transactionStatusQueryRepository.findFirstByOriginatorConversationId("orig-1"))
+                .thenReturn(Optional.empty());
+        when(transactionStatusQueryRepository.save(any(MpesaTransactionStatusQuery.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        walletService.handleTransactionStatusResult(transactionStatusResultJson(
+                "UHJA541HGH", "100.00", "", "Completed"));
+
+        verify(walletRepository, never()).save(any());
+        verify(walletTransactionRepository, never()).save(any());
+    }
+
     private void stubLookup(WalletTransaction tx) {
         lenient().when(walletTransactionRepository.findByIdAndOrganizationId(tx.getId(), organization.getId()))
                 .thenReturn(Optional.of(tx));
@@ -813,6 +879,35 @@ class WalletServiceStkTopupTest {
                   "FirstName": "Keneth"
                 }
                 """.formatted(receipt, billRef, msisdn);
+        return OBJECT_MAPPER.readTree(json);
+    }
+
+    private static JsonNode transactionStatusResultJson(
+            String receipt,
+            String amount,
+            String billRef,
+            String transactionStatus) throws Exception {
+        String json = """
+                {
+                  "Result": {
+                    "ResultType": 0,
+                    "ResultCode": 0,
+                    "ResultDesc": "The service request is processed successfully.",
+                    "OriginatorConversationID": "orig-1",
+                    "ConversationID": "AG_test",
+                    "TransactionID": "%s",
+                    "ResultParameters": {
+                      "ResultParameter": [
+                        {"Key": "ReceiptNo", "Value": "%s"},
+                        {"Key": "Amount", "Value": "%s"},
+                        {"Key": "TransactionStatus", "Value": "%s"},
+                        {"Key": "BillReferenceNumber", "Value": "%s"},
+                        {"Key": "DebitPartyName", "Value": "254711766223 - Keneth"}
+                      ]
+                    }
+                  }
+                }
+                """.formatted(receipt, receipt, amount, transactionStatus, billRef);
         return OBJECT_MAPPER.readTree(json);
     }
 

@@ -19,7 +19,9 @@ import com.novastack.sms.dto.response.AdminOrganizationResponse;
 import com.novastack.sms.dto.response.AnnouncementResponse;
 import com.novastack.sms.dto.response.ApiClientCreatedResponse;
 import com.novastack.sms.dto.response.ApiClientResponse;
+import com.novastack.sms.dto.response.ApiClientUsageOverviewResponse;
 import com.novastack.sms.dto.response.ApiClientUsageResponse;
+import com.novastack.sms.dto.response.ApiRequestLogResponse;
 import com.novastack.sms.dto.response.ApiResponse;
 import com.novastack.sms.dto.response.DeveloperConfigResponse;
 import com.novastack.sms.dto.response.MpesaReceiptLookupResponse;
@@ -322,10 +324,24 @@ public class AdminController {
         return ApiResponse.ok(developerPortalService.publicConfig());
     }
 
+    @GetMapping("/developer/api-usage")
+    @Operation(summary = "API request usage overview by API client")
+    public ApiResponse<ApiClientUsageOverviewResponse> apiUsageOverview() {
+        return ApiResponse.ok(developerPortalService.usageOverview());
+    }
+
     @GetMapping("/api-clients/{clientId}/usage")
-    @Operation(summary = "SMS usage attributed to an API client")
+    @Operation(summary = "HTTP and SMS usage attributed to an API client")
     public ApiResponse<ApiClientUsageResponse> apiClientUsage(@PathVariable UUID clientId) {
         return ApiResponse.ok(developerPortalService.usage(clientId));
+    }
+
+    @GetMapping("/api-clients/{clientId}/requests")
+    @Operation(summary = "Recent API request logs for a client (no bodies or secrets)")
+    public ApiResponse<Page<ApiRequestLogResponse>> apiClientRequests(
+            @PathVariable UUID clientId,
+            @PageableDefault(size = 30) Pageable pageable) {
+        return ApiResponse.ok(developerPortalService.requestLogs(clientId, pageable));
     }
 
     @PostMapping("/api-clients/{clientId}/test-send")

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { RouterLink } from 'vue-router'
+import BrandLogo from '@/components/common/BrandLogo.vue'
 
 withDefaults(
   defineProps<{
@@ -33,17 +33,7 @@ withDefaults(
         class="pointer-events-none absolute -bottom-20 left-10 h-64 w-64 rounded-full bg-brand-900/50 blur-3xl"
       />
 
-      <RouterLink to="/" class="relative z-10 flex items-center gap-2.5">
-        <span
-          class="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-600 text-sm font-bold text-white"
-        >
-          N
-        </span>
-        <span>
-          <span class="block text-sm font-semibold leading-none">Nova SMS</span>
-          <span class="mt-1 block text-[11px] text-brand-100">Bulk Gateway</span>
-        </span>
-      </RouterLink>
+      <BrandLogo to="/" height-class="h-11" class="relative z-10" />
 
       <div class="relative z-10 flex flex-1 flex-col justify-center py-16">
         <p class="text-[11px] font-semibold uppercase tracking-wider text-brand-200">
@@ -64,14 +54,7 @@ withDefaults(
 
     <section class="flex w-full flex-1 flex-col bg-surface-50 lg:w-[52%] lg:bg-white">
       <div class="flex items-center justify-between px-6 py-5 lg:hidden">
-        <RouterLink to="/" class="flex items-center gap-2.5">
-          <span
-            class="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-600 text-sm font-bold text-white"
-          >
-            N
-          </span>
-          <span class="text-sm font-semibold text-slate-900">Nova SMS</span>
-        </RouterLink>
+        <BrandLogo to="/" height-class="h-10" />
       </div>
 
       <div class="flex flex-1 items-center justify-center px-6 py-8 sm:px-10 lg:px-16">

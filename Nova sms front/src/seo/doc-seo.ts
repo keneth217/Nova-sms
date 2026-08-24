@@ -41,6 +41,36 @@ export const publicDocSeo: Record<
     description:
       'Show SMS balance and start M-Pesa STK top-ups with WALLET_READ and WALLET_TOPUP. Poll until walletCredited is true.',
   },
+  mpesa: {
+    title: 'M-Pesa API — STK Push, checkout, and Paybill C2B — Nova SMS',
+    description:
+      'Fund a Nova SMS wallet with M-Pesa STK Push, Lipa Na M-Pesa Online checkout, or Paybill. Authenticate with X-API-Key. Safaricom callbacks terminate on Nova SMS.',
+  },
+  'mpesa-stk': {
+    title: 'M-Pesa STK Push API — Nova SMS',
+    description:
+      'POST /api/v1/mpesa/stkpush with amount and phoneNumber. Poll Nova SMS until walletCredited is true. Permission MPESA_STK_PUSH.',
+  },
+  'mpesa-checkout': {
+    title: 'M-Pesa Checkout API — Nova SMS',
+    description:
+      'POST /api/v1/mpesa/checkout is Lipa Na M-Pesa Online, the same request as STK Push.',
+  },
+  'mpesa-status': {
+    title: 'M-Pesa payment status API — Nova SMS',
+    description:
+      'Poll GET /api/v1/mpesa/transactions/{id}/status or GET /api/v1/mpesa/checkout/{id}/status. Do not handle Safaricom callbacks yourself.',
+  },
+  'mpesa-c2b': {
+    title: 'M-Pesa Paybill C2B API — Nova SMS',
+    description:
+      'GET /api/v1/mpesa/c2b for Paybill and account. POST /api/v1/mpesa/c2b/verify with the M-Pesa receipt after the customer pays.',
+  },
+  'mpesa-callbacks': {
+    title: 'M-Pesa callbacks — Nova SMS',
+    description:
+      'Safaricom posts STK and C2B callbacks to Nova SMS. Integrating apps poll status or verify a receipt.',
+  },
   errors: {
     title: 'Nova SMS API errors',
     description: 'HTTP statuses and JSON message field used when a Nova SMS API call fails.',

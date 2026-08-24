@@ -29,18 +29,29 @@ import { RouterLink } from 'vue-router'
         transaction, credits once, and exposes status through the API.
       </p>
       <p class="mt-2">
-        Partner applications do not currently receive a customer-configured payment webhook. Use
-        <RouterLink to="/developers/wallet" class="font-medium text-brand-700 hover:underline">
-          the wallet status endpoints
+        Clients do not configure or implement Safaricom callbacks. Nova SMS handles Safaricom STK
+        and C2B callbacks internally. Client applications initiate payments through the Nova SMS API
+        and retrieve transaction status through the authenticated API. You do not implement Daraja
+        structure, Safaricom credentials, STK parsing, C2B validation, receipt extraction, callback
+        security, or reconciliation.
+      </p>
+      <p class="mt-2">
+        Partner applications do not receive a customer-configured payment webhook yet. Poll
+        <RouterLink to="/developers/mpesa" class="font-medium text-brand-700 hover:underline">
+          the authenticated M-Pesa API
         </RouterLink>
-        instead.
+        as the fallback. STK:
+        <code class="font-mono text-sm">GET /api/v1/mpesa/transactions/{id}/status</code>.
+        Paybill:
+        <code class="font-mono text-sm">GET /api/v1/mpesa/c2b/transactions</code>.
+        A later Nova webhook may send payment.success, payment.failed, and c2b.received.
       </p>
     </section>
 
     <section>
       <h2 class="text-xl font-semibold text-slate-900">Retry handling</h2>
       <p class="mt-2">
-        If an STK is still PENDING, <code class="font-mono text-sm">POST /api/v1/wallet/topup/{id}/check</code>
+        If an STK is still PENDING, <code class="font-mono text-sm">GET /api/v1/mpesa/transactions/{id}/status</code>
         reads the database and, when needed, queries Safaricom. That covers delayed callbacks. Keep
         polling every few seconds. Do not create another STK for the same attempt while PENDING.
       </p>
@@ -78,6 +89,7 @@ import { RouterLink } from 'vue-router'
       :links="[
         { to: '/mpesa-stk-push', label: 'M-Pesa STK Push lifecycle' },
         { to: '/mpesa-paybill', label: 'Paybill C2B account references' },
+        { to: '/developers/mpesa', label: 'M-Pesa API documentation' },
         { to: '/developers/wallet', label: 'Wallet API documentation' },
         { to: '/developers/status', label: 'SMS status API' },
       ]"

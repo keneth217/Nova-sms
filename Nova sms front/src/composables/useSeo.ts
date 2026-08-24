@@ -29,7 +29,7 @@ export function absoluteUrl(path = '/'): string {
 
 export function ogImageUrl(image?: string): string {
   if (image && /^https?:\/\//i.test(image)) return image
-  return `${siteOrigin()}${image || '/og-image.jpg'}`
+  return `${siteOrigin()}${image || '/novasmslogo.png'}`
 }
 
 function upsertMeta(attr: 'name' | 'property', key: string, content: string) {
@@ -76,7 +76,7 @@ export function applySeo(input: SeoInput) {
   upsertMeta('property', 'og:description', description)
   upsertMeta('property', 'og:url', url)
   upsertMeta('property', 'og:image', image)
-  upsertMeta('property', 'og:image:alt', `${SITE_NAME} — bulk SMS gateway for Kenya`)
+  upsertMeta('property', 'og:image:alt', `${SITE_NAME} — SMS & M-Pesa APIs`)
 
   upsertMeta('name', 'twitter:card', 'summary_large_image')
   upsertMeta('name', 'twitter:title', title)

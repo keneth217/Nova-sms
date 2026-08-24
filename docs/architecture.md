@@ -44,7 +44,32 @@ Dashboard sends and API-client sends use the same `SmsService`:
 6. Deliver through `SmsDeliveryService` → `SmsProvider`
 7. Refund on billable failure (`FAILED`, `REJECTED`, `CANCELLED`)
 
-API clients may also send `Idempotency-Key` on send/bulk so retries do not create duplicate SMS.
+API clients may also send `Idempotency-Key` on SMS send/bulk/resend-failed, STK/checkout, and wallet top-up so retries do not create duplicate SMS or a second STK Push.
+
+## M-Pesa (wallet funding)
+
+Dashboard top-ups and API-client top-ups use the same `WalletService`:
+
+```text
+                   NOVA SMS
+                      |
+          +-----------+-----------+
+          |                       |
+      SaaS Users             API Clients
+      (JWT dashboard)        (X-API-Key)
+          |                       |
+          +-----------+-----------+
+                      |
+                 WalletService
+                      |
+           wallet_transactions
+                      |
+              MpesaDarajaClient
+                      |
+                  Safaricom
+```
+
+Client apps call `POST /api/v1/mpesa/stkpush` or `POST /api/v1/mpesa/checkout`. They never call Daraja and never receive STK/C2B callbacks. Nova SMS is the callback layer. Status is `GET /api/v1/mpesa/transactions/{id}/status` or `GET /api/v1/mpesa/c2b/transactions`. If a Paybill callback is missing, Nova may ask Daraja Transaction Status internally when the client verifies a receipt. C2B registration is Super Admin only. See [M-Pesa](api/mpesa.md).
 
 ## Tenancy
 

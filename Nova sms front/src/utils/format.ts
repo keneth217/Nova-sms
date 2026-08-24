@@ -24,6 +24,21 @@ export function formatDate(value: string | null | undefined, withTime = true): s
   }).format(date)
 }
 
+export function formatRelativeTime(value: string | null | undefined): string {
+  if (!value) return '—'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '—'
+  const deltaSec = Math.round((Date.now() - date.getTime()) / 1000)
+  if (deltaSec < 10) return 'just now'
+  if (deltaSec < 60) return `${deltaSec} seconds ago`
+  const minutes = Math.round(deltaSec / 60)
+  if (minutes < 60) return `${minutes} minute${minutes === 1 ? '' : 's'} ago`
+  const hours = Math.round(minutes / 60)
+  if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`
+  const days = Math.round(hours / 24)
+  return `${days} day${days === 1 ? '' : 's'} ago`
+}
+
 export function formatPercent(value: number, digits = 1): string {
   return `${value.toFixed(digits)}%`
 }

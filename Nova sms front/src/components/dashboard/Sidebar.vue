@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
+import BrandLogo from '@/components/common/BrandLogo.vue'
 import {
   HomeIcon,
   WalletIcon,
@@ -8,7 +9,6 @@ import {
   QueueListIcon,
   UserGroupIcon,
   // IdentificationIcon,
-  KeyIcon,
   BookOpenIcon,
   // ChatBubbleLeftRightIcon,
   ClockIcon,
@@ -43,7 +43,6 @@ const orgLinks = [
   // { to: '/bulk-whatsapp', label: 'Bulk WhatsApp', icon: ChatBubbleLeftRightIcon },
   { to: '/contacts', label: 'Contacts', icon: UserGroupIcon },
   // { to: '/sender-ids', label: 'Sender IDs', icon: IdentificationIcon },
-  { to: '/api-clients', label: 'API clients', icon: KeyIcon },
   { to: '/sms-history', label: 'SMS History', icon: ClockIcon },
   // { to: '/whatsapp-history', label: 'WhatsApp History', icon: ChatBubbleLeftRightIcon },
   { to: '/reports', label: 'Reports', icon: ChartBarIcon },
@@ -80,17 +79,7 @@ function isActive(path: string) {
     :class="open ? 'translate-x-0' : '-translate-x-full'"
   >
     <div class="flex h-16 items-center justify-between border-b border-slate-100 px-5">
-      <RouterLink to="/dashboard" class="flex items-center gap-2.5" @click="$emit('close')">
-        <span
-          class="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-600 text-sm font-bold text-white"
-        >
-          N
-        </span>
-        <div>
-          <p class="text-sm font-semibold text-slate-900">Nova SMS</p>
-          <p class="text-[11px] text-slate-500">Bulk Gateway</p>
-        </div>
-      </RouterLink>
+      <BrandLogo to="/dashboard" height-class="h-10" @click="$emit('close')" />
       <button
         type="button"
         class="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 lg:hidden"

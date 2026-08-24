@@ -107,6 +107,37 @@ public interface WalletTransactionRepository extends JpaRepository<WalletTransac
             @Param("statusesEmpty") boolean statusesEmpty,
             Pageable pageable);
 
+    @Query(
+            value = """
+                    SELECT t FROM WalletTransaction t
+                    JOIN FETCH t.organization
+                    WHERE t.organization.id = :organizationId
+                      AND t.type = com.novastack.sms.domain.enums.WalletTransactionType.TOPUP
+                      AND (
+                            t.paymentMethod = com.novastack.sms.domain.enums.PaymentMethod.PAYBILL
+                            OR (
+                                t.paymentMethod IS NULL
+                                AND (t.checkoutRequestId IS NULL OR t.checkoutRequestId = '')
+                            )
+                          )
+                    ORDER BY t.createdAt DESC
+                    """,
+            countQuery = """
+                    SELECT COUNT(t) FROM WalletTransaction t
+                    WHERE t.organization.id = :organizationId
+                      AND t.type = com.novastack.sms.domain.enums.WalletTransactionType.TOPUP
+                      AND (
+                            t.paymentMethod = com.novastack.sms.domain.enums.PaymentMethod.PAYBILL
+                            OR (
+                                t.paymentMethod IS NULL
+                                AND (t.checkoutRequestId IS NULL OR t.checkoutRequestId = '')
+                            )
+                          )
+                    """)
+    Page<WalletTransaction> findC2bTopupsByOrganization(
+            @Param("organizationId") UUID organizationId,
+            Pageable pageable);
+
     @Query("""
             SELECT COALESCE(SUM(t.amount), 0) FROM WalletTransaction t
             WHERE t.organization.id = :organizationId
@@ -121,4 +152,8 @@ public interface WalletTransactionRepository extends JpaRepository<WalletTransac
             @Param("to") Instant to);
 
     long countByTypeAndTopupStatus(WalletTransactionType type, TopupStatus topupStatus);
+
+    long countByApiClientIdAndTypeAndCheckoutRequestIdIsNotNull(UUID apiClientId, WalletTransactionType type);
+
+    long countByApiClientIdAndTypeAndWalletCreditedTrue(UUID apiClientId, WalletTransactionType type);
 }

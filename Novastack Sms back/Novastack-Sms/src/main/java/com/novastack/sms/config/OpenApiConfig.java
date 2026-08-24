@@ -24,10 +24,15 @@ public class OpenApiConfig {
                         .title("Nova SMS API")
                         .description("""
                                 Multi-tenant SMS SaaS and developer gateway. External applications authenticate \
-                                with `X-API-Key` and call `/api/v1/sms/**` plus `/api/v1/wallet/**` when granted \
-                                `WALLET_READ` / `WALLET_TOPUP`. Nova SMS abstracts the upstream SMS \
-                                provider; never send TalkSasa tokens to this API. Optional `Idempotency-Key` \
-                                on POST /sms/send and POST /sms/bulk prevents duplicate sends.""")
+                                with `X-API-Key` and call `/api/v1/sms/**`, `/api/v1/wallet/**` when granted \
+                                `WALLET_READ` / `WALLET_TOPUP`, `/api/v1/mpesa/stkpush` or `/checkout` when granted \
+                                `MPESA_STK_PUSH` (or `WALLET_TOPUP`), and `/api/v1/mpesa/c2b/transactions` when granted \
+                                `MPESA_C2B` (or `WALLET_READ` / `WALLET_TOPUP`). Clients do not configure or \
+                                implement Safaricom callbacks — Nova handles STK and C2B internally; apps \
+                                retrieve status through the authenticated API. Never send TalkSasa or Daraja \
+                                tokens. Optional `Idempotency-Key` on POST /sms/send, POST /sms/bulk, \
+                                POST /sms/batches/{id}/resend-failed, POST /mpesa/stkpush, POST /mpesa/checkout, \
+                                and POST /wallet/topup prevents duplicate work.""")
                         .version("1.0.0")
                         .contact(new Contact().name("Novastack").email("support@novastack.com")))
                 .addServersItem(new Server().url(publicBase).description("Configured public API origin"))
